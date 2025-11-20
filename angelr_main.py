@@ -185,22 +185,58 @@ class Restaurant:
 
                 query = """
                     INSERT INTO restaurant (name, email, address, phoneNumber, priceRange, operatingHours, cuisine, ownerID)
-                    VALUES (%s, %s, %s, %s, %s)
-                """
-                my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine, self.owner_id))
-                DB_CONFIG.commit()
+                if self.restaurant_id == 0:  # Checks if restaurant is a new or existing restaurant
+                        
+                    query = """
+                        INSERT INTO restaurant (name, email, address, phoneNumber, priceRange, operatingHours, cuisine, ownerID)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """
+                    my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine, self.owner_id))
+                    DB_CONFIG.commit()
 
-                self.restaurant_id = my_cursor.lastrowid  # Get the auto-generated restaurantID
+                    self.restaurant_id = my_cursor.lastrowid  # Get the auto-generated restaurantID
 
-                print(f"Restaurant '{self.name}' added successfully with ID {self.restaurant_id}.")
-                my_cursor.close()
-                return True
+                    print(f"Restaurant '{self.name}' added successfully with ID {self.restaurant_id}.")
+                    my_cursor.close()
+                    return True
         
+                else:  # Updates existing restaurant
+
+                    query = """
+                        UPDATE restaurant 
+                        SET name = %s, email = %s, address = %s, phoneNumber = %s, priceRange = %s, operatingHours = %s, cuisine = %s
+                        WHERE restaurantID = %s
+                    """
+                    my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine, self.restaurant_id))
+                    DB_CONFIG.commit()
+
+                    print(f"Restaurant '{self.name}' successfully updated.")
+                    my_cursor.close()
+                    return True
+
         except mysql.connector.Error as err:
             print(f"Data Error during restaurant save: {err}")
             return False
         
-            
+    def update(self, fieldName, updatedValue):  # Takes the field and updates the value for that field.
+        if fieldName == 'name':
+            self.name = updatedValue
+        elif fieldName == 'email':
+            self.email = updatedValue
+        elif fieldName == 'address':
+            self.address = updatedValue
+        elif fieldName == 'phoneNumber':
+            self.phoneNumber = updatedValue
+        elif fieldName == 'priceRange':
+            self.priceRange = updatedValue
+        elif fieldName == 'operatingHours':
+            self.operatingHours = updatedValue
+        elif fieldName == 'cuisine':
+            self.cuisine = updatedValue
+        else:
+            raise ValueError(f"Field '{fieldName}' does not exist.")
+        
+        self.save()
 
     @staticmethod
     def get_restaurant_by_name(name: str):
@@ -456,11 +492,141 @@ def registration_workflow():
     else:
         print("Invalid input, please enter 1 or 2.")
         return
+
+#The function below imitates owner dashboard functions
+#Used when owner wants to create, update, or delete a restaurant
+def modify_restaurant(owner_id):
+    mycursor = DB_CONFIG.cursor()
+    while True:
+        try:
+            print("\nWhat would you like to do?")
+            print("[1] Create new restaurant")
+            print("[2] Update a restaurant")
+            print("[3] Delete a restaurant")
+            print("[4] Quit")
+            choice = input("Enter choice: ").strip()
+
+        except ValueError:
+            print("Invalid input, please enter 1, 2, 3,or 4.")
+            return
+
+        if choice == '4':
+            print("Exiting Owner Dashboard.")
+            break
+
+        if choice == '1':  # Create a new restaurant
+            print(f"Please enter restaurant information: ")
+            restaurant_name = input("Enter the restaurant name: ").strip()
+            restaurant_email = input("Enter the restaurant email: ").strip()
+            restaurant_address = input("Enter the restaurant address: ").strip()
+            restaurant_phoneNumber = input("Enter the restaurant phone number: ").strip()
+            restaurant_priceRange = input("Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
+            restaurant_operatingHours = input("Enter the restaurant operating hours: ").strip()
+            restaurant_cuisine = input("Enter the restaurant cuisine type: ").strip()
+
+            new_restaurant = Restaurant(
+                restaurant_id=0,
+                name=restaurant_name,
+                email=restaurant_email,
+                phoneNumber=restaurant_phoneNumber,
+                priceRange=restaurant_priceRange,
+                operatingHours=restaurant_operatingHours,
+                cuisine=restaurant_cuisine,
+                address=restaurant_address,
+                owner_id=owner_id
+            )
+
+            new_restaurant.save()
+            continue
+
+        elif choice == '2':  # Update restaurant information
+            query = "SELECT * FROM restaurant WHERE ownerID = %s"
+            mycursor.execute(query, (owner_id,))
+            restaurants = mycursor.fetchall()
+
+            if restaurants:
+                print(f"Your restaurants: ")
+                for i, restaurant in enumerate(restaurants, 1):
+                    print(f"{i}. {restaurant[1]}")
+
+                try:
+                    choice = int(input("Enter the number of the restaurant you want to update: ")) - 1
+
+                    if 0 <= choice < len(restaurants):
+                            restaurant_info = restaurants[choice]
+
+                    while True:
+                        selected_restaurant = Restaurant(
+                            restaurant_id=restaurant_info[0],
+                            name=restaurant_info[1],
+                            email=restaurant_info[2],
+                            address=restaurant_info[3],
+                            phoneNumber=restaurant_info[4],
+                            priceRange=restaurant_info[5],
+                            operatingHours=restaurant_info[6],
+                            cuisine=restaurant_info[7],
+                            owner_id=restaurant_info[8]
+                        )
+                        
+                        fieldName = input("What field would you like to update?: ").strip()
+                        updatedValue = input("Enter the updated information: ").strip()
+
+                        selected_restaurant.update(fieldName, updatedValue)
+
+                        another = input("""Update another field? 
+                        [1] Yes
+                        [2] No""").strip().lower()
+                        if another == '2':
+                            break
+
+                except ValueError:
+                    print("Please enter a valid number")
+                
+            else:
+                print("You don't own any restaurants.")
+                continue
+
+        elif choice == '3':  # Delete restaurant from database
+            query = "SELECT * FROM restaurant WHERE ownerID = %s"
+            mycursor.execute(query, (owner_id,))
+            restaurants = mycursor.fetchall()
+
+            if restaurants:
+                print("Your restaurants: ")
+                for i, restaurant in enumerate(restaurants, 1):
+                    print(f"{i}. {restaurant[1]}")
+                try:
+                    choice = int(input("Enter the number of the restaurant you want to delete: ")) - 1
+
+                    if 0 <= choice < len(restaurants):
+                        restaurant_id = restaurants[choice][0]
+                        restaurant_name = restaurants[choice][1]
+
+                        confirmation = input(f"""Are you sure you want to delete restaurant {restaurant_name}? 
+                        [1] Yes
+                        [2] No""").lower()
+                    
+                        if confirmation == '1':
+                            mycursor.execute(f"DELETE FROM restaurant WHERE restaurantID = %s AND ownerID = %s", (restaurant_id, owner_id))
+                            DB_CONFIG.commit()
+                            print(f"Restaurant {restaurant_name} deleted")
+                        else:
+                            print(f"Restaurant {restaurant_name} not deleted")
+
+                except ValueError:
+                    print("Please enter a valid number")
+
+            else:
+                print("You don't own any restaurants.")
+                continue
+
+    mycursor.close()
+
 #the below function is called when a user wants to delete their account
 #deletes account from the database
 def delete_account():
     username = input("Enter your username: ").strip()
-    password = input("Enter your account password: ").strip()\
+    password = input("Enter your account password: ").strip()
     
     mycursor = DB_CONFIG.cursor()
 
@@ -855,6 +1021,7 @@ def main_menu():
             
             if is_owner:
                 print("[5] Owner Console (Manage Replies)")
+                print("[7] Owner Dashboard")
                 
             print("[9] Logout")
             
@@ -884,6 +1051,11 @@ def main_menu():
 
         elif choice == '6' and not current_user:
             delete_account()
+
+        elif choice == '7' and is_owner:
+            logged_in_id = current_user.owner_id
+            modify_restaurant(logged_in_id)
+
 
         elif choice == '9' and current_user:
             logout_workflow()
