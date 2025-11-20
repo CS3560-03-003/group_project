@@ -172,6 +172,95 @@ class RestaurantGUI:
         tk.Button(self.root, text = "Submit Review", command = submit_review, bg = "blue", fg = "white").pack(pady = 10)
         tk.Button(self.root, text = "Back", command = self.show_dashboard).pack()
 
+    def show_search_reviews_screen(self):
+        self.clear_window()
+
+        tk.Label(self.root, text = "Search Reviews by Restaurant",
+                 font=("Arial", 16), bg = "#E3F2FD", fg = "#0D47A1").pack(pady = 10)
+
+        search_frame = tk.Frame(self.root, bg = "#E3F2FD")
+        search_frame.pack(pady = 10)
+
+        tk.Label(search_frame, text = "Restaurant Name:", bg = "#E3F2FD").pack(side = tk.LEFT, padx = 5)
+
+        self.search_combo = ttk.Combobox(search_frame, width = 30, state = "readonly")
+        self.search_combo.pack(side = tk.LEFT, padx = 5)
+
+        res_names = self.get_all_restaurant_names()
+        self.search_combo['values'] = res_names
+        if res_names:
+            self.search_combo.current(0)
+
+        columns = ('Restaurant', 'Rating', 'Review', 'Reply')
+        tree = ttk.Treeview(self.root, columns = columns, show = 'headings', height = 10)
+
+        # Define Column Headings
+        tree.heading('Restaurant', text = 'Restaurant')
+        tree.heading('Rating', text = 'Rating')
+        tree.heading('Review', text = 'Review')
+        tree.heading('Reply', text = 'Owner Reply')
+
+        # Define Column Widths
+        tree.column('Restaurant', width = 120)
+        tree.column('Rating', width = 50, anchor='center')
+        tree.column('Review', width = 250)
+        tree.column('Reply', width = 250)
+
+        tree.pack(pady = 10, padx = 20, fill = tk.BOTH, expand = True)
+
+        def perform_search():
+            # Name from dropdown
+            r_name = self.search_combo.get().strip()
+
+            if not r_name:
+                return
+
+            # Logic used from main
+            r_name_clean = r_name.replace(" ", "").lower()
+
+            # clear previous
+            for item in tree.get_children():
+                tree.delete(item)
+
+            try:
+                conn = db_app.get_DB_CONFIG_connection()
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT 
+                        b.name, a.rating, a.reviewContent, c.replyContent
+                    FROM reviews a
+                    JOIN restaurant b ON b.restaurantID = a.restaurantID
+                    LEFT JOIN replies c ON a.reviewID = c.reviewID
+                    WHERE REPLACE(LOWER(b.name), ' ', '') = %s
+                    ORDER BY a.reviewDate DESC
+                """
+
+                cursor.execute(query, (r_name_clean,))
+                results = cursor.fetchall()
+
+                if not results:
+                    messagebox.showinfo("Info", f"No reviews found for '{r_name}'.")
+
+                for row in results:
+                    # Handle no reply
+                    restaurant_name, rating, content, reply = row
+                    display_reply = reply if reply else "No Reply"
+                    tree.insert('', tk.END, values = (restaurant_name, rating, content, display_reply))
+
+                cursor.close()
+                conn.close()
+
+            except mysql.connector.Error as err:
+                messagebox.showerror("Database Error", f"Error searching: {err}")
+
+        # Search Button
+        tk.Button(search_frame, text = "Search", command = perform_search,
+                  bg = "#2196F3", fg = "white").pack(side = tk.LEFT, padx = 10)
+
+        # Back Button
+        tk.Button(self.root, text = "Back to Dashboard", command = self.show_dashboard).pack(pady = 10)
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = RestaurantGUI(root)
