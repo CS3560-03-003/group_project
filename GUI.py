@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 # Connect to existing code
+# main should be what your main code is titled
 import main as db_app
 
 class RestaurantGUI:
