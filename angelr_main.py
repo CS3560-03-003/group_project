@@ -901,6 +901,112 @@ def res_owner_reply_function(owner_id: int):
             mycursor.close()
   
 
+def update_delete_review(logged_in_customerid: int):
+    
+    #Update(including deleting) review for a customer base on the restaurant name of the customer input.
+    print("\n--- Update or Delete Your Review ---")
+
+    restaurant_name = input("Enter the restaurant name you reviewed: ").strip()
+
+    restaurant_obj = Restaurant.get_restaurant_by_name(restaurant_name)
+    
+    if not restaurant_obj:
+        print("Unfortunately the restaurant you entered is not partnered with our application.")
+        return
+    try: 
+        with DB.get_DB_CONFIG_connection() as DB_CONFIG:
+            my_cursor = DB_CONFIG.cursor(dictionary=True)
+            query = '''
+            SELECT 
+                c.username,
+                re.reviewContent,
+                re.rating,
+                r.name AS restaurant_name,
+                re.reviewID,
+                ry.replyID
+            FROM reviews re
+            JOIN restaurant r ON r.restaurantID = re.restaurantID
+            JOIN customers c ON c.customerID = re.customerID
+            LEFT JOIN replies ry ON ry.reviewID = re.reviewID
+            WHERE re.customerID = %s
+            AND r.name = %s
+            '''
+            my_cursor.execute(query, (logged_in_customerid, restaurant_name))
+            result = my_cursor.fetchone()
+
+            my_cursor.close()
+            if not result:
+                print("You do not have a review on this restaurant yet.")
+                return
+            
+            print(f"\nRestaurant: {result['restaurant_name']}")
+            print(f"Your Current Rating: {result['rating']}")
+            print(f"Your Current Review: {result['reviewContent']}\n")
+
+            print("Choose 1 to edited the review.")
+            print("Choose 2 to delete the review. (Caution! deleted review does not have back up!)")
+            print("choose other key to quit. ")
+
+            choose = input("Enter your option: ")
+
+            if choose == "1":
+                while True:
+                    try:
+                        #ask for the new     
+                        new_rating_input = input("Enter new rating(1-5): ").strip()
+                        new_rating = int(new_rating_input)
+                        if 1 <= new_rating <= 5: 
+                            break
+                        else:
+                            print("rating must between 1 to 5.")
+                    except ValueError:
+                        print("Invalid rating. Please enter a number between 1 and 5.")
+                        
+                    # Ask for new review content
+                new_content = input("Enter your new review content: ").strip()
+
+                update_query = '''
+                    UPDATE reviews
+                    SET rating = %s, reviewContent = %s
+                    WHERE reviewID = %s
+                    '''
+                my_cursor = DB_CONFIG.cursor()
+                my_cursor.execute(update_query, (new_rating, new_content, result["reviewID"]))
+                DB_CONFIG.commit()
+                my_cursor.close()
+
+            elif choose == "2":
+                print("confirm to delete your review")
+                confirm = input("Enter 1 for yes, other for quit. ")
+                if confirm == "1":
+                    delete_review_query = '''
+                                DELETE 
+                                FROM reviews
+                                WHERE reviewID = %s
+                                '''
+                    my_cursor = DB_CONFIG.cursor()
+                    my_cursor.execute(delete_review_query, (result["reviewID"]))
+                    DB_CONFIG.commit()
+                    #also if the review has reply, the reply should be deleted
+                    if result["replyID"] is not None:
+                        delete_reply_query = '''
+                                            DELETE
+                                            FROM replies
+                                            WHERE reviewID = %s
+                                        '''
+                        my_cursor = DB_CONFIG.cursor()
+                        my_cursor.execute(delete_reply_query, (result["reviewID"]))
+                        DB_CONFIG.commit()    
+                    my_cursor.close()
+            else:
+                return
+
+    except DB.mysql.connector.Error as err:
+            print(f"Data Error during restaurant lookup: {err}")
+            return None
+
+
+
 #just testing here, can delete
 #user_type = login()
 #if current_username:
@@ -1018,6 +1124,7 @@ def main_menu():
         else:
             if is_customer:
                 print("[4] Post New Review")
+                print("[8] Update or Delete your Review")
             
             if is_owner:
                 print("[5] Owner Console (Manage Replies)")
@@ -1055,7 +1162,10 @@ def main_menu():
         elif choice == '7' and is_owner:
             logged_in_id = current_user.owner_id
             modify_restaurant(logged_in_id)
-
+            
+        elif choice == '8' and is_customer:
+            logged_in_id = current_user.owner_id
+            update_delete_review(logged_in_id)
 
         elif choice == '9' and current_user:
             logout_workflow()
@@ -1076,4 +1186,5 @@ if __name__ == "__main__":
     if DB_CONFIG: 
         main_menu()
     else:
+
         print("Application cannot start due to initial database connection error.")
