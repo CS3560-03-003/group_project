@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import mysql
 
 # Connect to existing code
 # main should be what your main code is titled
@@ -114,19 +115,23 @@ class RestaurantGUI:
         tk.Label(self.root, text = "Write a New Review", font = ("Arial", 16)).pack(pady = 10)
 
         tk.Label(self.root, text="Select Restaurant:").pack()
-
         self.combo_res_name = ttk.Combobox(self.root, width = 30, state = "readonly")
+        self.combo_res_name['values'] = self.get_all_restaurant_names()
+        if self.combo_res_name['values']:
+            self.combo_res_name.current(0)
         self.combo_res_name.pack(pady = 5)
+
+        tk.Label(self.root, text = "Rating (1-5):").pack()
+
+        combo_rating = ttk.Combobox(self.root, values = [1, 2, 3, 4, 5], state = "readonly")
+        combo_rating.current(4)  # Default to 5 stars
+        combo_rating.pack(pady = 5)
 
         restaurant_names = self.get_all_restaurant_names()
         self.combo_res_name['values'] = restaurant_names
 
         if restaurant_names:
             self.combo_res_name.current(0)  # start on first name
-
-        tk.Label(self.root, text = "Rating (1-5):").pack()
-        combo_rating = ttk.Combobox(self.root, values = [1, 2, 3, 4, 5])
-        combo_rating.pack()
 
         tk.Label(self.root, text = "Review Content:").pack()
         entry_content = tk.Entry(self.root, width = 50)
