@@ -183,13 +183,11 @@ class Restaurant:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor()
 
-                query = """
-                    INSERT INTO restaurant (name, email, address, phoneNumber, priceRange, operatingHours, cuisine, ownerID)
                 if self.restaurant_id == 0:  # Checks if restaurant is a new or existing restaurant
                         
                     query = """
                         INSERT INTO restaurant (name, email, address, phoneNumber, priceRange, operatingHours, cuisine, ownerID)
-                        VALUES (%s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """
                     my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine, self.owner_id))
                     DB_CONFIG.commit()
@@ -237,6 +235,16 @@ class Restaurant:
             raise ValueError(f"Field '{fieldName}' does not exist.")
         
         self.save()
+
+    def display_restaurant_details(self):
+        print("\nRESTAURANT DETAILS:")
+        print(f"Name: {self.name}")
+        print(f"Email: {self.email}")
+        print(f"Address: {self.address}")
+        print(f"Phone: {self.phoneNumber}")
+        print(f"Price Range: {self.priceRange}")
+        print(f"Hours: {self.operatingHours}")
+        print(f"Cuisine: {self.cuisine}")
 
     @staticmethod
     def get_restaurant_by_name(name: str):
@@ -496,66 +504,43 @@ def registration_workflow():
 #The function below imitates owner dashboard functions
 #Used when owner wants to create, update, or delete a restaurant
 def modify_restaurant(owner_id):
-    mycursor = DB_CONFIG.cursor()
-    while True:
-        try:
-            print("\nWhat would you like to do?")
-            print("[1] Create new restaurant")
-            print("[2] Update a restaurant")
-            print("[3] Delete a restaurant")
-            print("[4] Quit")
-            choice = input("Enter choice: ").strip()
+    with get_DB_CONFIG_connection() as DB_CONFIG:
+        mycursor = DB_CONFIG.cursor()
+        while True:
+            try:
+                
+                print("\nWhat would you like to do?")
+                print("[1] View your restaurants")
+                print("[2] Create new restaurant")
+                print("[3] Update a restaurant")
+                print("[4] Delete a restaurant")
+                print("[5] Quit")
+                choice = input("Enter choice: ").strip()
 
-        except ValueError:
-            print("Invalid input, please enter 1, 2, 3,or 4.")
-            return
+            except ValueError:
+                print("Invalid input, please enter a valid number.")
+                return
 
-        if choice == '4':
-            print("Exiting Owner Dashboard.")
-            break
+            if choice == '5':
+                print("Exiting Owner Dashboard.")
+                break
 
-        if choice == '1':  # Create a new restaurant
-            print(f"Please enter restaurant information: ")
-            restaurant_name = input("Enter the restaurant name: ").strip()
-            restaurant_email = input("Enter the restaurant email: ").strip()
-            restaurant_address = input("Enter the restaurant address: ").strip()
-            restaurant_phoneNumber = input("Enter the restaurant phone number: ").strip()
-            restaurant_priceRange = input("Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
-            restaurant_operatingHours = input("Enter the restaurant operating hours: ").strip()
-            restaurant_cuisine = input("Enter the restaurant cuisine type: ").strip()
+            if choice == '1':
+                query = "SELECT * FROM restaurant WHERE ownerID = %s"
+                mycursor.execute(query, (owner_id,))
+                restaurants = mycursor.fetchall()
 
-            new_restaurant = Restaurant(
-                restaurant_id=0,
-                name=restaurant_name,
-                email=restaurant_email,
-                phoneNumber=restaurant_phoneNumber,
-                priceRange=restaurant_priceRange,
-                operatingHours=restaurant_operatingHours,
-                cuisine=restaurant_cuisine,
-                address=restaurant_address,
-                owner_id=owner_id
-            )
+                if restaurants:
+                    print(f"Your restaurants: ")
+                    for i, restaurant in enumerate(restaurants, 1):
+                        print(f"{i}. {restaurant[1]}")
 
-            new_restaurant.save()
-            continue
+                    try:
+                        choice = int(input("Enter the number of the restaurant you want to view: ")) - 1
 
-        elif choice == '2':  # Update restaurant information
-            query = "SELECT * FROM restaurant WHERE ownerID = %s"
-            mycursor.execute(query, (owner_id,))
-            restaurants = mycursor.fetchall()
-
-            if restaurants:
-                print(f"Your restaurants: ")
-                for i, restaurant in enumerate(restaurants, 1):
-                    print(f"{i}. {restaurant[1]}")
-
-                try:
-                    choice = int(input("Enter the number of the restaurant you want to update: ")) - 1
-
-                    if 0 <= choice < len(restaurants):
+                        if 0 <= choice < len(restaurants):
                             restaurant_info = restaurants[choice]
 
-                    while True:
                         selected_restaurant = Restaurant(
                             restaurant_id=restaurant_info[0],
                             name=restaurant_info[1],
@@ -568,59 +553,120 @@ def modify_restaurant(owner_id):
                             owner_id=restaurant_info[8]
                         )
                         
-                        fieldName = input("What field would you like to update?: ").strip()
-                        updatedValue = input("Enter the updated information: ").strip()
+                        selected_restaurant.display_restaurant_details()
 
-                        selected_restaurant.update(fieldName, updatedValue)
+                    except ValueError:
+                        print("Please enter a valid number")
 
-                        another = input("""Update another field? 
-                        [1] Yes
-                        [2] No""").strip().lower()
-                        if another == '2':
-                            break
+                else:
+                    print("You don't own any restaurants.")
+                    continue
+            
+            elif choice == '2':  # Create a new restaurant
+                print(f"Please enter restaurant information: ")
+                restaurant_name = input("Enter the restaurant name: ").strip()
+                restaurant_email = input("Enter the restaurant email: ").strip()
+                restaurant_address = input("Enter the restaurant address: ").strip()
+                restaurant_phoneNumber = input("Enter the restaurant phone number: ").strip()
+                restaurant_priceRange = input("Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
+                restaurant_operatingHours = input("Enter the restaurant operating hours: ").strip()
+                restaurant_cuisine = input("Enter the restaurant cuisine type: ").strip()
 
-                except ValueError:
-                    print("Please enter a valid number")
-                
-            else:
-                print("You don't own any restaurants.")
+                new_restaurant = Restaurant(
+                    restaurant_id=0,
+                    name=restaurant_name,
+                    email=restaurant_email,
+                    phoneNumber=restaurant_phoneNumber,
+                    priceRange=restaurant_priceRange,
+                    operatingHours=restaurant_operatingHours,
+                    cuisine=restaurant_cuisine,
+                    address=restaurant_address,
+                    owner_id=owner_id
+                )
+
+                new_restaurant.save()
                 continue
 
-        elif choice == '3':  # Delete restaurant from database
-            query = "SELECT * FROM restaurant WHERE ownerID = %s"
-            mycursor.execute(query, (owner_id,))
-            restaurants = mycursor.fetchall()
+            elif choice == '3':  # Update restaurant information
+                query = "SELECT * FROM restaurant WHERE ownerID = %s"
+                mycursor.execute(query, (owner_id,))
+                restaurants = mycursor.fetchall()
 
-            if restaurants:
-                print("Your restaurants: ")
-                for i, restaurant in enumerate(restaurants, 1):
-                    print(f"{i}. {restaurant[1]}")
-                try:
-                    choice = int(input("Enter the number of the restaurant you want to delete: ")) - 1
+                if restaurants:
+                    print(f"Your restaurants: ")
+                    for i, restaurant in enumerate(restaurants, 1):
+                        print(f"{i}. {restaurant[1]}")
 
-                    if 0 <= choice < len(restaurants):
-                        restaurant_id = restaurants[choice][0]
-                        restaurant_name = restaurants[choice][1]
+                    try:
+                        choice = int(input("Enter the number of the restaurant you want to update: ")) - 1
 
-                        confirmation = input(f"""Are you sure you want to delete restaurant {restaurant_name}? 
-                        [1] Yes
-                        [2] No""").lower()
+                        if 0 <= choice < len(restaurants):
+                            restaurant_info = restaurants[choice]
+
+                        while True:
+                            selected_restaurant = Restaurant(
+                                restaurant_id=restaurant_info[0],
+                                name=restaurant_info[1],
+                                email=restaurant_info[2],
+                                address=restaurant_info[3],
+                                phoneNumber=restaurant_info[4],
+                                priceRange=restaurant_info[5],
+                                operatingHours=restaurant_info[6],
+                                cuisine=restaurant_info[7],
+                                owner_id=restaurant_info[8]
+                            )
+
+                            selected_restaurant.display_restaurant_details()
+
+                            fieldName = input("What field would you like to update?: ").strip().lower()
+                            updatedValue = input("Enter the updated information: ").strip()
+
+                            selected_restaurant.update(fieldName, updatedValue)
+
+                            another = input("""Update another field? [1] Yes [2] No """).strip()
+                            if another == '2':
+                                break
+
+                    except ValueError:
+                        print("Please enter a valid number")
                     
-                        if confirmation == '1':
-                            mycursor.execute(f"DELETE FROM restaurant WHERE restaurantID = %s AND ownerID = %s", (restaurant_id, owner_id))
-                            DB_CONFIG.commit()
-                            print(f"Restaurant {restaurant_name} deleted")
-                        else:
-                            print(f"Restaurant {restaurant_name} not deleted")
+                else:
+                    print("You don't own any restaurants.")
+                    continue
 
-                except ValueError:
-                    print("Please enter a valid number")
+            elif choice == '4':  # Delete restaurant from database
+                query = "SELECT * FROM restaurant WHERE ownerID = %s"
+                mycursor.execute(query, (owner_id,))
+                restaurants = mycursor.fetchall()
 
-            else:
-                print("You don't own any restaurants.")
-                continue
+                if restaurants:
+                    print("Your restaurants: ")
+                    for i, restaurant in enumerate(restaurants, 1):
+                        print(f"{i}. {restaurant[1]}")
+                    try:
+                        choice = int(input("Enter the number of the restaurant you want to delete: ")) - 1
 
-    mycursor.close()
+                        if 0 <= choice < len(restaurants):
+                            restaurant_id = restaurants[choice][0]
+                            restaurant_name = restaurants[choice][1]
+
+                            confirmation = input(f"""Are you sure you want to delete restaurant {restaurant_name}? [1] Yes [2] No """).strip()
+                        
+                            if confirmation == '1':
+                                mycursor.execute(f"DELETE FROM restaurant WHERE restaurantID = %s AND ownerID = %s", (restaurant_id, owner_id))
+                                DB_CONFIG.commit()
+                                print(f"Restaurant {restaurant_name} deleted")
+                            else:
+                                print(f"Restaurant {restaurant_name} not deleted")
+
+                    except ValueError:
+                        print("Please enter a valid number")
+
+                else:
+                    print("You don't own any restaurants.")
+                    continue
+
+        mycursor.close()
 
 #the below function is called when a user wants to delete their account
 #deletes account from the database
