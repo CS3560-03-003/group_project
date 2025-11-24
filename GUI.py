@@ -47,6 +47,34 @@ class RestaurantGUI:
 
         tk.Button(self.root, text = "Login", command = self.perform_login, bg = "#4CAF50", fg = "white").pack(pady = 20)
 
+        def show_registration_screen(self):
+        self.clear_window()
+
+        tk.Label(self.root, text = "Create Account", font = ("Arial", 20, "bold")).pack(pady = 20)
+
+        # User Type Selection
+        tk.Label(self.root, text = "I am a:").pack()
+        type_var = tk.StringVar(value = "Customer")
+        frame_type = tk.Frame(self.root)
+        frame_type.pack(pady = 5)
+
+        tk.Radiobutton(frame_type, text = "Customer", variable = type_var, value = "Customer").pack(
+            side = tk.LEFT, padx = 10)
+        tk.Radiobutton(frame_type, text = "Restaurant Owner", variable = type_var, value = "Owner").pack(
+            side = tk.LEFT, padx = 10)
+
+        # Inputs
+        entries = {}
+        fields = ["Username", "Password", "Full Name", "Email"]
+
+        for field in fields:
+            tk.Label(self.root, text = f"{field}:").pack(pady = (5, 0))
+            entry = tk.Entry(self.root, width = 30)
+            if field == "Password":
+                entry.config(show = "*")
+            entry.pack(pady = 2)
+            entries[field] = entry
+    
     def perform_login(self):
         username = self.entry_user.get()
         password = self.entry_pass.get()
