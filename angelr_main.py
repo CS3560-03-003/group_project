@@ -1,14 +1,12 @@
 import mysql.connector
 
-
 DB_CONFIG_PARAMS = {
     "host": "localhost",
     "user": "root",
-    "password": "10473Cvusd:)",
+    "password": "password123",
     "port": "3306",
     "database": "cs3560"
 }
-
 
 try:
     DB_CONFIG = mysql.connector.connect(**DB_CONFIG_PARAMS)
@@ -18,31 +16,30 @@ except mysql.connector.Error as err:
 
 # --- STEP 3: Define the Connection Function for OOP Classes ---
 # This function is used inside the `with` blocks in your class methods.
-def get_DB_CONFIG_connection(): 
+def get_DB_CONFIG_connection():
     # Returns a NEW connection using the dictionary
     return mysql.connector.connect(**DB_CONFIG_PARAMS)
 
-current_username = None # Keep this if needed for legacy functions
-# --- Review Class --- 
+current_username = None  # Keep this if needed for legacy functions
+# --- Review Class ---
 class Review:
     def __init__(self, review_id: int, restaurant_id: int, user_id: int, rating: float, review_content: str, review_date: str):
-        self.review_id: int = review_id             # Primary key    
-        self.restaurant_id: int = restaurant_id     # Foreign key to Restaurant
-        self.user_id: int = user_id                 # Foreign key to User
-        self.rating: float = rating                 # Rating out of 5
-        self.review_content: str = review_content   # Text content of the review
-        self.review_date: str = review_date         # Date when the review was posted
+        self.review_id: int = review_id  # Primary key
+        self.restaurant_id: int = restaurant_id  # Foreign key to Restaurant
+        self.user_id: int = user_id  # Foreign key to User
+        self.rating: float = rating  # Rating out of 5
+        self.review_content: str = review_content  # Text content of the review
+        self.review_date: str = review_date  # Date when the review was posted
 
-        def __str__(self) -> str: # String representation of the Review object
+        def __str__(self) -> str:  # String representation of the Review object
             return f"Review #{self.review_id} - Rating: {self.rating}/5"
-        
 
     def save(self):
         """Saves the review to the database."""
         if not all([self.restaurant_id, self.user_id, self.rating, self.review_content]):
             print("Error: All review fields must be provided.")
             return False
-        
+
         try:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor()
@@ -59,12 +56,13 @@ class Review:
                 print(f"Review #{self.review_id} saved successfully.")
                 my_cursor.close()
                 return True
-            
+
         except mysql.connector.Error as err:
             print(f"Data Error during review save: {err}")
             return False
-        
-        #Static method to search for reviews by restaurant name
+
+        # Static method to search for reviews by restaurant name
+
     @staticmethod
     def searching_for_review():
         r_name = input("What restaurant would you like to search for?").strip()
@@ -92,12 +90,12 @@ class Review:
         except mysql.connector.Error as err:
             print(f"Data Error during review search: {err}")
             return
-        
+
         if not results:
             print(f"\nNo reviews found for '{r_name}', try again :).")
             return
-        
-        print(f"\n--- Reviews for: {results [0][1]} ---") #restults[0][1] is restaurant name
+
+        print(f"\n--- Reviews for: {results[0][1]} ---")  # restults[0][1] is restaurant name
 
         for (review_id, r_name, rating, review_message, review_date, reply_content, reply_date) in results:
             review_display = f"Restaurant Review: {reply_content} (on {reply_date.strftime('%Y-%m-%d')})" if reply_content else "Restaurant Reply: **None**"
@@ -111,12 +109,13 @@ class Review:
         {review_display}
 -------------------------------
     """)
+
 class Reply:
 
     def __init__(self, reply_id: int, review_id: int, user_id: int, reply_content: str, reply_date: str):
-        self.reply_id: int = reply_id               #Will hold ID once saved to DB
-        self.review_id: int = review_id             # Foreign key to Review
-        self.user_id: int = user_id                 # Foreign key to User  
+        self.reply_id: int = reply_id  # Will hold ID once saved to DB
+        self.review_id: int = review_id  # Foreign key to Review
+        self.user_id: int = user_id  # Foreign key to User
         self.reply_content: str = reply_content
         self.reply_date: str = reply_date
 
@@ -132,14 +131,14 @@ class Reply:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor()
 
-
                 # -- Step 1: Check if a reply already exists for the given review_id
                 # This ensures that each review has at most one reply
                 my_cursor.execute("SELECT replyID FROM replies WHERE reviewID = %s", (self.review_id,))
                 if my_cursor.fetchone():
-                    print(f" Error: A reply for reviewID {self.review_id} already exists. Cannot create duplicate replies.")
+                    print(
+                        f" Error: A reply for reviewID {self.review_id} already exists. Cannot create duplicate replies.")
                     return False
-                
+
                 # -- Step 2: Insert the new reply into the database
                 query = """
                     INSERT INTO replies (reviewID, ownerID, replyContent, replyDate)
@@ -153,11 +152,11 @@ class Reply:
                 print(f" Owner Reply for reviewID {self.review_id} posted successfully.")
                 my_cursor.close()
                 return True
-            
+
         except mysql.connector.Error as err:
             print(f"Data Error during reply save: {err}")
             return False
-        
+
 
 class Restaurant:
 
@@ -170,26 +169,27 @@ class Restaurant:
         self.priceRange: str = priceRange
         self.operatingHours: str = operatingHours
         self.cuisine: str = cuisine
-        self.owner_id: int = owner_id          # Foreign key to "Owner" User type
+        self.owner_id: int = owner_id  # Foreign key to "Owner" User type
 
     def save(self):
 
-        if not all([self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine]):
+        if not all([self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours,
+                    self.cuisine]):
             print("Error: All restaurant fields must be provided.")
             return False
-        
 
         try:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor()
 
                 if self.restaurant_id == 0:  # Checks if restaurant is a new or existing restaurant
-                        
+
                     query = """
                         INSERT INTO restaurant (name, email, address, phoneNumber, priceRange, operatingHours, cuisine, ownerID)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """
-                    my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine, self.owner_id))
+                    my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange,
+                                              self.operatingHours, self.cuisine, self.owner_id))
                     DB_CONFIG.commit()
 
                     self.restaurant_id = my_cursor.lastrowid  # Get the auto-generated restaurantID
@@ -197,7 +197,7 @@ class Restaurant:
                     print(f"Restaurant '{self.name}' added successfully with ID {self.restaurant_id}.")
                     my_cursor.close()
                     return True
-        
+
                 else:  # Updates existing restaurant
 
                     query = """
@@ -205,7 +205,8 @@ class Restaurant:
                         SET name = %s, email = %s, address = %s, phoneNumber = %s, priceRange = %s, operatingHours = %s, cuisine = %s
                         WHERE restaurantID = %s
                     """
-                    my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange, self.operatingHours, self.cuisine, self.restaurant_id))
+                    my_cursor.execute(query, (self.name, self.email, self.address, self.phoneNumber, self.priceRange,
+                                              self.operatingHours, self.cuisine, self.restaurant_id))
                     DB_CONFIG.commit()
 
                     print(f"Restaurant '{self.name}' successfully updated.")
@@ -215,7 +216,7 @@ class Restaurant:
         except mysql.connector.Error as err:
             print(f"Data Error during restaurant save: {err}")
             return False
-        
+
     def update(self, fieldName, updatedValue):  # Takes the field and updates the value for that field.
         if fieldName == 'name':
             self.name = updatedValue
@@ -233,7 +234,7 @@ class Restaurant:
             self.cuisine = updatedValue
         else:
             raise ValueError(f"Field '{fieldName}' does not exist.")
-        
+
         self.save()
 
     def display_restaurant_details(self):
@@ -255,7 +256,7 @@ class Restaurant:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor(dictionary=True)
                 query = """
-                    SELECT restaurantID, name, location, cuisine, address, ownerID 
+                    SELECT restaurantID, name, email, address, phoneNumber, priceRange, operatingHours, cuisine, ownerID 
                     FROM restaurant
                     WHERE REPLACE(LOWER(name), ' ', '') = %s
                 """
@@ -267,9 +268,12 @@ class Restaurant:
                     return Restaurant(
                         restaurant_id=result['restaurantID'],
                         name=result['name'],
-                        location=result['location'],
-                        cuisine=result['cuisine'],
+                        email=result['email'],
                         address=result['address'],
+                        phoneNumber=result['phoneNumber'],
+                        priceRange=result['priceRange'],
+                        operatingHours=result['operatingHours'],
+                        cuisine=result['cuisine'],
                         owner_id=result['ownerID']
                     )
                 else:
@@ -279,29 +283,30 @@ class Restaurant:
         except mysql.connector.Error as err:
             print(f"Data Error during restaurant lookup: {err}")
             return None
-    
+
+
 class Owner:
     """Represents a restaurant owner user."""
 
     def __init__(self, owner_id: int, username: str, password: str, email: str, full_name: str):
-        self.owner_id: int = owner_id           # Primary key
+        self.owner_id: int = owner_id  # Primary key
         self.username: str = username
-        self.password: str = password           
+        self.password: str = password
         self.email: str = email
         self.full_name: str = full_name
-
 
     def register(self):
         """Registers the owner in the database."""
         if not all([self.username, self.password, self.email, self.full_name]):
             print("Error: All owner fields must be provided.")
             return False
-        
+
         try:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor()
 
-                my_cursor.execute("SELECT ownerID FROM Owners WHERE username = %s OR email = %s", (self.username, self.email))
+                my_cursor.execute("SELECT ownerID FROM Owners WHERE username = %s OR email = %s",
+                                  (self.username, self.email))
                 if my_cursor.fetchone():
                     print("Error: An owner with the given username or email already exists.")
                     return False
@@ -310,7 +315,7 @@ class Owner:
                     INSERT INTO Owners (username, password, email, full_name)
                     VALUES (%s, %s, %s, %s)
                 """
-                #Execute the insert query
+                # Execute the insert query
                 my_cursor.execute(query, (self.username, self.password, self.email, self.full_name,))
                 DB_CONFIG.commit()
 
@@ -319,11 +324,10 @@ class Owner:
                 print(f"Owner '{self.username}' registered successfully with ID {self.owner_id}.")
                 my_cursor.close()
                 return True
-        
+
         except mysql.connector.Error as err:
             print(f"Data Error during owner registration: {err}")
             return False
-        
 
     @staticmethod
     def login(username: str, password: str):
@@ -336,7 +340,7 @@ class Owner:
                     FROM Owners
                     WHERE username = %s AND password = %s
                 """
-                
+
                 my_cursor.execute(query, (username, password))
                 result = my_cursor.fetchone()
                 my_cursor.close()
@@ -356,13 +360,14 @@ class Owner:
         except mysql.connector.Error as err:
             print(f"Data Error during owner login: {err}")
             return None
-            
+
+
 class Customer:
 
     def __init__(self, customer_id: int, username: str, password: str, email: str, full_name: str):
-        self.customer_id: int = customer_id         # Primary key
+        self.customer_id: int = customer_id  # Primary key
         self.username: str = username
-        self.password: str = password           
+        self.password: str = password
         self.email: str = email
         self.full_name: str = full_name
 
@@ -371,12 +376,13 @@ class Customer:
         if not all([self.username, self.password, self.email, self.full_name]):
             print("Error: All customer fields must be provided.")
             return False
-        
+
         try:
             with get_DB_CONFIG_connection() as DB_CONFIG:
                 my_cursor = DB_CONFIG.cursor()
 
-                my_cursor.execute("SELECT customerID FROM Customers WHERE username = %s OR email = %s", (self.username, self.email))
+                my_cursor.execute("SELECT customerID FROM Customers WHERE username = %s OR email = %s",
+                                  (self.username, self.email))
                 if my_cursor.fetchone():
                     print("Error: A customer with the given username or email already exists.")
                     return False
@@ -393,11 +399,11 @@ class Customer:
                 print(f"Customer '{self.username}' registered successfully with ID {self.customer_id}.")
                 my_cursor.close()
                 return True
-        
+
         except mysql.connector.Error as err:
             print(f"Data Error during customer registration: {err}")
             return False
-        
+
     @staticmethod
     def login(username: str, password: str):
         """Logs in the customer with the given credentials."""
@@ -410,7 +416,7 @@ class Customer:
                     FROM Customers
                     WHERE username = %s AND password = %s
                 """
-                
+
                 my_cursor.execute(query, (username, password))
                 result = my_cursor.fetchone()
                 my_cursor.close()
@@ -427,15 +433,52 @@ class Customer:
                 else:
                     print("Invalid username or password.")
                     return None
-                
+
         except mysql.connector.Error as err:
             print(f"Data Error during customer login: {err}")
             return None
 
+    def update_account(self, new_username, new_password, new_email, new_full_name):
+        """Updates the customer's account details in the database."""
 
-#Remnants of code from group member below
-#The below function adds a new user to the database
-#used when we have a new user creating an account
+        try:
+            with get_DB_CONFIG_connection() as DB_CONFIG:
+                my_cursor = DB_CONFIG.cursor()
+
+                check_query = """
+                    SELECT customerID FROM Customers 
+                    WHERE (username = %s OR email = %s) AND customerID != %s
+                """
+                my_cursor.execute(check_query, (new_username, new_email, self.customer_id))
+                if my_cursor.fetchone():
+                    print("Error: Username or Email already exists.")
+                    return False
+
+                query = """
+                    UPDATE Customers
+                    SET username = %s, password = %s, email = %s, full_name = %s
+                    WHERE customerID = %s
+                """
+                my_cursor.execute(query, (new_username, new_password, new_email, new_full_name, self.customer_id))
+                DB_CONFIG.commit()
+
+                self.username = new_username
+                self.password = new_password
+                self.email = new_email
+                self.full_name = new_full_name
+
+                print("Account details updated successfully.")
+                my_cursor.close()
+                return True
+
+        except mysql.connector.Error as err:
+            print(f"Data Error during account update: {err}")
+            return False
+
+
+# Remnants of code from group member below
+# The below function adds a new user to the database
+# used when we have a new user creating an account
 def registration_workflow():
     print("Lets create an account!")
     try:
@@ -446,34 +489,34 @@ def registration_workflow():
     except ValueError:
         print("Invalid input, please enter 1 or 2.")
         return
-    
+
     username = input("Enter your username: ").strip()
     password = input("Enter your account password: ").strip()
     full_name = input("Enter your full name: ").strip()
     email = input("Enter your email: ").strip()
 
     if type_of_user == 1:
-        #Uses the Owner class to register a new restaurant owner
+        # Uses the Owner class to register a new restaurant owner
         new_owner = Owner(owner_id=0, username=username, password=password, email=email, full_name=full_name)
         new_owner.register()
 
         try:
             print("\n Do you want to add a restaurant now?")
             add_restaurant_choice = int(input("[1] Yes   [2] No: ").strip())
-        
+
         except ValueError:
             print("Invalid input, please enter 1 or 2.")
             return
-        
+
         if add_restaurant_choice == 1:
             restaurant_name = input("Enter the restaurant name: ").strip()
             restaurant_email = input("Enter the restaurant email: ").strip()
             restaurant_address = input("Enter the restaurant address: ").strip()
             restaurant_phoneNumber = input("Enter the restaurant phone number: ").strip()
-            restaurant_priceRange = input("Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
+            restaurant_priceRange = input(
+                "Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
             restaurant_operatingHours = input("Enter the restaurant operating hours: ").strip()
             restaurant_cuisine = input("Enter the restaurant cuisine type: ").strip()
-
 
             new_restaurant = Restaurant(
                 restaurant_id=0,
@@ -491,9 +534,9 @@ def registration_workflow():
 
         if add_restaurant_choice == 2:
             print("Note: You can add a restaurant later from your owner dashboard.")
-   
+
     elif type_of_user == 2:
-       #Uses the Customer class to register a new customer
+        # Uses the Customer class to register a new customer
         new_customer = Customer(customer_id=0, username=username, password=password, email=email, full_name=full_name)
         new_customer.register()
 
@@ -501,14 +544,15 @@ def registration_workflow():
         print("Invalid input, please enter 1 or 2.")
         return
 
-#The function below imitates owner dashboard functions
-#Used when owner wants to create, update, or delete a restaurant
+
+# The function below imitates owner dashboard functions
+# Used when owner wants to create, update, or delete a restaurant
 def modify_restaurant(owner_id):
     with get_DB_CONFIG_connection() as DB_CONFIG:
         mycursor = DB_CONFIG.cursor()
         while True:
             try:
-                
+
                 print("\nWhat would you like to do?")
                 print("[1] View your restaurants")
                 print("[2] Create new restaurant")
@@ -552,7 +596,7 @@ def modify_restaurant(owner_id):
                             cuisine=restaurant_info[7],
                             owner_id=restaurant_info[8]
                         )
-                        
+
                         selected_restaurant.display_restaurant_details()
 
                     except ValueError:
@@ -561,14 +605,15 @@ def modify_restaurant(owner_id):
                 else:
                     print("You don't own any restaurants.")
                     continue
-            
+
             elif choice == '2':  # Create a new restaurant
                 print(f"Please enter restaurant information: ")
                 restaurant_name = input("Enter the restaurant name: ").strip()
                 restaurant_email = input("Enter the restaurant email: ").strip()
                 restaurant_address = input("Enter the restaurant address: ").strip()
                 restaurant_phoneNumber = input("Enter the restaurant phone number: ").strip()
-                restaurant_priceRange = input("Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
+                restaurant_priceRange = input(
+                    "Enter the restaurant price range: (Using $ from 1 to 5 dollar signs) ").strip()
                 restaurant_operatingHours = input("Enter the restaurant operating hours: ").strip()
                 restaurant_cuisine = input("Enter the restaurant cuisine type: ").strip()
 
@@ -629,7 +674,7 @@ def modify_restaurant(owner_id):
 
                     except ValueError:
                         print("Please enter a valid number")
-                    
+
                 else:
                     print("You don't own any restaurants.")
                     continue
@@ -650,10 +695,12 @@ def modify_restaurant(owner_id):
                             restaurant_id = restaurants[choice][0]
                             restaurant_name = restaurants[choice][1]
 
-                            confirmation = input(f"""Are you sure you want to delete restaurant {restaurant_name}? [1] Yes [2] No """).strip()
-                        
+                            confirmation = input(
+                                f"""Are you sure you want to delete restaurant {restaurant_name}? [1] Yes [2] No """).strip()
+
                             if confirmation == '1':
-                                mycursor.execute(f"DELETE FROM restaurant WHERE restaurantID = %s AND ownerID = %s", (restaurant_id, owner_id))
+                                mycursor.execute(f"DELETE FROM restaurant WHERE restaurantID = %s AND ownerID = %s",
+                                                 (restaurant_id, owner_id))
                                 DB_CONFIG.commit()
                                 print(f"Restaurant {restaurant_name} deleted")
                             else:
@@ -668,12 +715,13 @@ def modify_restaurant(owner_id):
 
         mycursor.close()
 
-#the below function is called when a user wants to delete their account
-#deletes account from the database
+
+# the below function is called when a user wants to delete their account
+# deletes account from the database
 def delete_account():
     username = input("Enter your username: ").strip()
     password = input("Enter your account password: ").strip()
-    
+
     mycursor = DB_CONFIG.cursor()
 
     mycursor.execute("SELECT ownerID FROM Owners WHERE username = %s AND password = %s", (username, password))
@@ -684,12 +732,12 @@ def delete_account():
         mycursor.execute("SELECT customerID FROM Customers WHERE username = %s AND password = %s", (username, password))
         user_data = mycursor.fetchone()
         table_name = "Customers"
-    
+
     if user_data:
         confirmation = input("""Are you sure you want to delete this account? 
         [1] Yes
         [2] No""").lower()
-        
+
         if confirmation == "1":
             # Execute deletion on the correct table
             mycursor.execute(f"DELETE FROM {table_name} WHERE username = %s", (username,))
@@ -699,14 +747,14 @@ def delete_account():
             print("Account not deleted")
     else:
         print("Account not found")
-        
+
     mycursor.close()
 
-#this function is called when a user who is already logged in (through calling login function before this), wants to enter a new review
+
+# this function is called when a user who is already logged in (through calling login function before this), wants to enter a new review
 def adding_review_workflow(logged_in_customerid: int):
     print("\n--- Add a New Review ---")
 
-    
     restaurant_name = input("Enter the restaurant name you reviewed: ").strip()
 
     restaurant_obj = Restaurant.get_restaurant_by_name(restaurant_name)
@@ -714,32 +762,31 @@ def adding_review_workflow(logged_in_customerid: int):
     if not restaurant_obj:
         print("Unfortunately the restaurant you entered is not partnered with our application.")
         return
-    
+
     # Get rating from user
-    try: 
+    try:
         rating_input = input("Enter rating (1-5): ").strip()
         rating = float(rating_input)
 
         if rating < 1 or rating > 5:
             print("Rating must be between 1 and 5.")
             return
-        
+
     except ValueError:
         print("Invalid rating. Please enter a number between 1 and 5.")
         return
-    
 
-    #Get review content from user
+    # Get review content from user
     content = input("Write your review: ").strip()
     if not content:
         print("Review cannot be empty.")
         return
-    
+
     print("\n--- Attempting to post your review... ---")
 
-    #create Review object and save to database
+    # create Review object and save to database
     new_review = Review(
-        review_id=None, # Will be set after saving to DB
+        review_id=None,  # Will be set after saving to DB
         restaurant_id=restaurant_obj.restaurant_id,
         customer_id=logged_in_customerid,
         rating=rating,
@@ -753,10 +800,9 @@ def adding_review_workflow(logged_in_customerid: int):
         print(" Review posting failed due to an error.")
 
 
-#Updated function for restaurant owners to reply to reviews that incorporates the Reply class and its save method
-#Below function is used when a restaurant owner logs in, and wants to see reviews, reply to them, or delete/ edit replies they entered in the past
+# Updated function for restaurant owners to reply to reviews that incorporates the Reply class and its save method
+# Below function is used when a restaurant owner logs in, and wants to see reviews, reply to them, or delete/ edit replies they entered in the past
 def res_owner_reply_function(owner_id: int):
-
     print("\n--- Restaurant Owner Reply Console ---")
     print("Tip: Use this console to manage your restaurant's reviews and replies.\n")
 
@@ -770,18 +816,18 @@ def res_owner_reply_function(owner_id: int):
             if not ownedrestaurants:
                 print("You do not own any restaurants in our system.")
                 return
-            
-            #If the owner owns multiple restaurants, list them
-            #Ask which restaurant they want to manage
+
+            # If the owner owns multiple restaurants, list them
+            # Ask which restaurant they want to manage
             if len(ownedrestaurants) > 1:
                 print("You own multiple restaurants. Please select one to manage:")
                 for i, res in enumerate(ownedrestaurants):
-                    print(f"[{i+1}] {res['name']} (ID: {res['restaurantID']})")
+                    print(f"[{i + 1}] {res['name']} (ID: {res['restaurantID']})")
 
                 choice_input = input("Enter the number of the restaurant you want to manage: ").strip()
 
                 try:
-                    res_index =  int(choice_input) - 1
+                    res_index = int(choice_input) - 1
                     if 0 <= res_index < len(ownedrestaurants):
                         selected_restaurant = ownedrestaurants[res_index]
                     else:
@@ -793,7 +839,8 @@ def res_owner_reply_function(owner_id: int):
             else:
                 selected_restaurant = ownedrestaurants[0]
 
-                print(f"Managing reviews for restaurant: {selected_restaurant['name']} (ID: {selected_restaurant['restaurantID']})")
+                print(
+                    f"Managing reviews for restaurant: {selected_restaurant['name']} (ID: {selected_restaurant['restaurantID']})")
 
             # 2. ----  Restaurant Management Menu Loop  ----
             while True:
@@ -806,9 +853,9 @@ def res_owner_reply_function(owner_id: int):
                 if choice_main == '3':
                     print("Exiting Restaurant Owner Reply Console.")
                     break
-                
+
                 if choice_main == '1':
-                    #View unreplied reviews and add replies
+                    # View unreplied reviews and add replies
                     mycursor.execute("""
                         SELECT a.reviewID, a.reviewDate, a.rating, a.reviewContent
                         FROM reviews a
@@ -820,10 +867,10 @@ def res_owner_reply_function(owner_id: int):
 
                     if not pending:
                         print(f"✅ No unreplied reviews currently found for {selected_restaurant['name']}.")
-                        continue # Go back to the main owner menu
-                    
+                        continue  # Go back to the main owner menu
+
                     print(f"\n--- Unreplied Reviews for {selected_restaurant['name']} ---")
-                    valid_ids = set() # Needed to validate user input later
+                    valid_ids = set()  # Needed to validate user input later
 
                     # Loop through and display the reviews
                     for row in pending:
@@ -850,7 +897,7 @@ def res_owner_reply_function(owner_id: int):
                             print("Empty reply skipped.")
                             continue
 
-                        #Create a Reply object and save it to the database
+                        # Create a Reply object and save it to the database
                         new_reply = Reply(
                             reply_id=None,  # Will be set after saving to DB
                             review_id=review_id,
@@ -862,7 +909,7 @@ def res_owner_reply_function(owner_id: int):
                         new_reply.save()
 
                 elif choice_main == '2':
-                #View replied reviews and edit/delete replies
+                    # View replied reviews and edit/delete replies
                     mycursor.execute("""
                         SELECT a.reviewID, a.reviewDate, a.rating, a.reviewContent,
                             c.replyContent, c.replyDate
@@ -870,8 +917,8 @@ def res_owner_reply_function(owner_id: int):
                         JOIN replies c ON c.reviewID = a.reviewID
                         WHERE a.restaurantID = %s AND c.ownerID = %s
                         ORDER BY a.reviewDate
-                    """, (selected_restaurant['restaurantID'], owner_id)) # Corrected to use owner_id
-                    
+                    """, (selected_restaurant['restaurantID'], owner_id))  # Corrected to use owner_id
+
                     replied = mycursor.fetchall()
 
                     if not replied:
@@ -899,7 +946,7 @@ def res_owner_reply_function(owner_id: int):
 
                         if action == '3':
                             break
-                        
+
                         if action not in ['1', '2']:
                             print("Invalid action. Please choose 1, 2, or 3.")
                             continue
@@ -932,7 +979,7 @@ def res_owner_reply_function(owner_id: int):
 
                         elif action == '2':
                             # ... (Delete logic) ...
-                            
+
                             mycursor.execute("""
                                 DELETE FROM replies
                                     WHERE reviewID = %s AND ownerID = %s
@@ -945,22 +992,21 @@ def res_owner_reply_function(owner_id: int):
     finally:
         if mycursor:
             mycursor.close()
-  
+
 
 def update_delete_review(logged_in_customerid: int):
-    
-    #Update(including deleting) review for a customer base on the restaurant name of the customer input.
+    # Update(including deleting) review for a customer base on the restaurant name of the customer input.
     print("\n--- Update or Delete Your Review ---")
 
     restaurant_name = input("Enter the restaurant name you reviewed: ").strip()
 
     restaurant_obj = Restaurant.get_restaurant_by_name(restaurant_name)
-    
+
     if not restaurant_obj:
         print("Unfortunately the restaurant you entered is not partnered with our application.")
         return
-    try: 
-        with DB.get_DB_CONFIG_connection() as DB_CONFIG:
+    try:
+        with get_DB_CONFIG_connection() as DB_CONFIG:
             my_cursor = DB_CONFIG.cursor(dictionary=True)
             query = '''
             SELECT 
@@ -984,7 +1030,7 @@ def update_delete_review(logged_in_customerid: int):
             if not result:
                 print("You do not have a review on this restaurant yet.")
                 return
-            
+
             print(f"\nRestaurant: {result['restaurant_name']}")
             print(f"Your Current Rating: {result['rating']}")
             print(f"Your Current Review: {result['reviewContent']}\n")
@@ -998,16 +1044,16 @@ def update_delete_review(logged_in_customerid: int):
             if choose == "1":
                 while True:
                     try:
-                        #ask for the new     
+                        # ask for the new
                         new_rating_input = input("Enter new rating(1-5): ").strip()
                         new_rating = int(new_rating_input)
-                        if 1 <= new_rating <= 5: 
+                        if 1 <= new_rating <= 5:
                             break
                         else:
                             print("rating must between 1 to 5.")
                     except ValueError:
                         print("Invalid rating. Please enter a number between 1 and 5.")
-                        
+
                     # Ask for new review content
                 new_content = input("Enter your new review content: ").strip()
 
@@ -1033,7 +1079,7 @@ def update_delete_review(logged_in_customerid: int):
                     my_cursor = DB_CONFIG.cursor()
                     my_cursor.execute(delete_review_query, (result["reviewID"]))
                     DB_CONFIG.commit()
-                    #also if the review has reply, the reply should be deleted
+                    # also if the review has reply, the reply should be deleted
                     if result["replyID"] is not None:
                         delete_reply_query = '''
                                             DELETE
@@ -1042,78 +1088,78 @@ def update_delete_review(logged_in_customerid: int):
                                         '''
                         my_cursor = DB_CONFIG.cursor()
                         my_cursor.execute(delete_reply_query, (result["reviewID"]))
-                        DB_CONFIG.commit()    
+                        DB_CONFIG.commit()
                     my_cursor.close()
             else:
                 return
 
-    except DB.mysql.connector.Error as err:
-            print(f"Data Error during restaurant lookup: {err}")
-            return None
+    except mysql.connector.Error as err:
+        print(f"Data Error during restaurant lookup: {err}")
+        return None
 
 
-
-#just testing here, can delete
-#user_type = login()
-#if current_username:
+# just testing here, can delete
+# user_type = login()
+# if current_username:
 #    adding_review(current_username)
-#else:
+# else:
 #    print("No user is logged in.")
 
 
-#call this function whenever you are tesing things out and want to make sure all the tables are correct
-#or use this whenever you want to see the tables
+# call this function whenever you are tesing things out and want to make sure all the tables are correct
+# or use this whenever you want to see the tables
 def print_all_tables():
     """Fetches and prints all rows from the five core tables (for debugging purposes)."""
-    
+
     # Check if the global connection object is available
     if not DB_CONFIG:
         print("Cannot print tables due to database connection error.")
         return
 
     mycursor = DB_CONFIG.cursor()
-    
+
     # Updated list of tables to match your final schema
     tables = ["Owners", "Customers", "restaurant", "reviews", "replies"]
-    
+
     for table in tables:
         try:
             # Note: We must use the specific ID name for the foreign key display logic
             # However, for simple printing, SELECT * is easiest.
-            mycursor.execute(f"SELECT * FROM {table}") 
+            mycursor.execute(f"SELECT * FROM {table}")
             results = mycursor.fetchall()
-            
+
             print("\n")
             print(f"--- {table.upper()} TABLE: ---")
-            
+
             if not results:
                 print("--- (EMPTY) ---")
                 continue
-            
+
             # Print column headers first (optional, but helpful)
             # headers = [i[0] for i in mycursor.description]
             # print(headers)
-            
+
             for row in results:
                 print(row)
-                
+
         except mysql.connector.Error as err:
             print(f"Error reading table {table}: {err}")
 
     mycursor.close()
 
+
 # The procedural call that runs on script load should be removed or commented out for the main app loop
 # print_all_tables()
 print_all_tables()
 
-
 # --- Global State ---
-current_user = None 
+current_user = None
+
 
 # --- Login Workflow (REVISED) ---
 def login_workflow():
     global current_user
-    
+
     if current_user:
         # We can determine the type here using isinstance()
         user_class = type(current_user).__name__
@@ -1123,9 +1169,9 @@ def login_workflow():
     user_type_input = input("Log in as [1] Owner or [2] Customer: ").strip()
     username = input("Enter username: ").strip()
     password = input("Enter password: ").strip()
-    
+
     logged_in_object = None
-    
+
     if user_type_input == '1':
         logged_in_object = Owner.login(username, password)
     elif user_type_input == '2':
@@ -1133,9 +1179,10 @@ def login_workflow():
     else:
         print("Invalid choice for user type.")
         return
-    
+
     if logged_in_object:
-        current_user = logged_in_object # Set the object regardless of type
+        current_user = logged_in_object  # Set the object regardless of type
+
 
 # --- Logout Workflow (Cleaned) ---
 def logout_workflow():
@@ -1146,6 +1193,7 @@ def logout_workflow():
         current_user = None
     else:
         print("No user is currently logged in.")
+
 
 # ====================================================================
 # D. MAIN MENU
@@ -1158,11 +1206,11 @@ def main_menu():
         status = f"{current_user.username} ({type(current_user).__name__})" if current_user else "Not Logged In"
         print(f"\n===== Restaurant Review System | Status: {status} =====")
         print("[1] Search Reviews (General View)")
-        
+
         # Determine available actions based on login status and object type
         is_owner = isinstance(current_user, Owner)
         is_customer = isinstance(current_user, Customer)
-        
+
         if not current_user:
             print("[2] Login")
             print("[3] Register New Account")
@@ -1171,32 +1219,32 @@ def main_menu():
             if is_customer:
                 print("[4] Post New Review")
                 print("[8] Update or Delete your Review")
-            
+
             if is_owner:
                 print("[5] Owner Console (Manage Replies)")
                 print("[7] Owner Dashboard")
-                
+
             print("[9] Logout")
-            
+
         print("[0] Exit System")
         print("[*] Print All Tables (DEBUG)")
 
         choice = input("Enter your choice: ").strip()
-        
+
         # --- Handle Choices ---
         if choice == '1':
             Review.searching_for_review()
-        
+
         elif choice == '2' and not current_user:
             login_workflow()
-        
+
         elif choice == '3' and not current_user:
             registration_workflow()
-            
+
         elif choice == '4' and is_customer:
-            # We now safely access the user's ID via the object's attribute 
-            logged_in_id = current_user.customer_id 
-            adding_review_workflow(logged_in_id) 
+            # We now safely access the user's ID via the object's attribute
+            logged_in_id = current_user.customer_id
+            adding_review_workflow(logged_in_id)
 
         elif choice == '5' and is_owner:
             logged_in_id = current_user.owner_id
@@ -1208,28 +1256,28 @@ def main_menu():
         elif choice == '7' and is_owner:
             logged_in_id = current_user.owner_id
             modify_restaurant(logged_in_id)
-            
+
         elif choice == '8' and is_customer:
             logged_in_id = current_user.owner_id
             update_delete_review(logged_in_id)
 
         elif choice == '9' and current_user:
             logout_workflow()
-        
+
         elif choice == '*':
             print_all_tables()
-            
+
         elif choice == '0':
             print("Shutting down. Goodbye!")
             break
-            
+
         else:
             print("Invalid choice or action not available.")
 
-            
+
 # --- Final Execution Block ---
 if __name__ == "__main__":
-    if DB_CONFIG: 
+    if DB_CONFIG:
         main_menu()
     else:
 
