@@ -858,6 +858,17 @@ class RestaurantGUI:
                 self.show_dashboard()
             else:
                 messagebox.showerror("Error", "Update failed. Username or Email might be taken.")
+        
+        def delete_account():
+            confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete your account? This action is irreversible.")
+            if confirm:
+                if self.current_user.delete_account():
+                    messagebox.showinfo("Deleted", "Your account has been deleted.")
+                    self.current_user = None
+                    self.show_login_screen()
+                else:
+                    messagebox.showerror("Error", "Failed to delete account.")
+
 
         # Buttons
         btn_frame = tk.Frame(self.root)
@@ -866,6 +877,7 @@ class RestaurantGUI:
         tk.Button(btn_frame, text = "Save Changes", command = save_changes, width = 15).pack(
             side = tk.LEFT, padx = 10)
         tk.Button(btn_frame, text = "Cancel", command=self.show_dashboard).pack(side = tk.LEFT, padx = 10)
+        tk.Button(btn_frame, text = "Delete Account", command = delete_account, fg = "red").pack(side = tk.LEFT, padx = 10)
 
 
 if __name__ == "__main__":
