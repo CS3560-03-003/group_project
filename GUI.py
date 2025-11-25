@@ -145,7 +145,13 @@ class RestaurantGUI:
         elif isinstance(self.current_user, db_app.Owner):
             self.show_owner_menu()
 
-        tk.Button(self.root, text = "Logout", command = self.show_login_screen, fg = "red").pack(side = tk.BOTTOM, pady = 20)
+        tk.Button(self.root, text = "Logout", command = self.logout, fg = "red").pack(side = tk.BOTTOM, pady = 20)
+
+    # clear current user
+    def logout(self):
+        self.current_user = None
+        self.show_login_screen()
+
 
     # set up customer options
     def show_customer_menu(self):
@@ -158,12 +164,255 @@ class RestaurantGUI:
         tk.Button(frame, text = "Edit Account Info", width = 30, command = self.show_edit_account_screen).pack(pady = 10)
 
     def show_owner_menu(self):
-        frame = tk.Frame(self.root, bg = "white")
+        frame = tk.Frame(self.root)
         frame.pack(pady = 20)
 
-        tk.Button(frame, text = "Manage & Reply to Reviews", width = 30, command = self.show_owner_reply_screen).pack(pady = 10)
-        tk.Button(frame, text = "Manage My Restaurants (Add/Edit)", width = 30, command = self.show_manage_restaurants_screen).pack(pady = 10)
         tk.Button(frame, text = "Search All Reviews", width = 30, command = self.show_search_reviews_screen).pack(pady = 10)
+        tk.Button(frame, text = "Reply or Delete Reviews", width = 30, command = self.show_owner_reply_screen).pack(pady = 10)
+
+        tk.Button(frame, text = "View Restaurants", width = 30, command = self.show_owner_restaurants_screen).pack(pady = 10)
+        tk.Button(frame, text = "Add New Restaurant", width = 35, command = self.show_add_restaurant_screen).pack(pady = 10)
+        tk.Button(frame, text = "Edit a Restaurant", width = 35, command = self.show_manage_restaurants_screen).pack(pady = 10)
+        tk.Button(frame, text = "Delete a Restaurant", width = 35, command = self.show_manage_restaurants_screen).pack(pady = 10)
+
+    def show_owner_restaurants_screen(self):
+        self.clear_window()
+
+        tk.Label(self.root, text = "My Restaurants Overview", font = ("Arial", 16, "bold")).pack(pady = 20)
+
+        columns = ('Name', 'Cuisine', 'Price', 'Hours', 'Phone', 'Address')
+        tree = ttk.Treeview(self.root, columns = columns, show = 'headings', height = 15)
+
+        tree.heading('Name', text = 'Name')
+        tree.column('Name', width = 150, anchor = 'w')
+
+        tree.heading('Cuisine', text = 'Cuisine')
+        tree.column('Cuisine', width = 100, anchor = 'center')
+
+        tree.heading('Price', text = 'Price')
+        tree.column('Price', width = 60, anchor = 'center')
+
+        tree.heading('Hours', text = 'Hours')
+        tree.column('Hours', width = 120, anchor='w')
+
+        tree.heading('Phone', text = 'Phone')
+        tree.column('Phone', width = 100, anchor = 'center')
+
+        tree.heading('Address', text = 'Address')
+        tree.column('Address', width = 200, anchor = 'w')
+
+        tree.pack(pady = 10, padx = 20, fill = tk.BOTH, expand = True)
+
+        try:
+            conn = db_app.get_DB_CONFIG_connection()
+            cursor = conn.cursor()
+
+            query = """
+                SELECT name, cuisine, priceRange, operatingHours, phoneNumber, address 
+                FROM restaurant 
+                WHERE ownerID = %s
+                ORDER BY name
+            """
+            cursor.execute(query, (self.current_user.owner_id,))
+            rows = cursor.fetchall()
+
+            if not rows:
+                tk.Label(self.root, text = "You haven't added any restaurants yet.").pack()
+
+            for row in rows:
+                tree.insert('', tk.END, values = row)
+
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+
+
+        tk.Button(self.root, text = "Back to Dashboard", command = self.show_dashboard).pack(side = tk.BOTTOM, pady = 20)
+
+    def show_owner_reply_screen(self):
+        self.clear_window()
+
+        tk.Label(self.root, text = "Manage & Reply to Reviews", font = ("Arial", 16, "bold")).pack(pady = 20)
+        tk.Label(self.root, text = "Select a review to reply or delete.",font = ("Arial", 10, "italic")).pack(pady = 5)
+
+        columns = ('Review ID', 'Restaurant', 'Review', 'Current Reply')
+        tree = ttk.Treeview(self.root, columns = columns, show = 'headings', height = 10)
+
+        tree.heading('Review ID', text = 'ID')
+        tree.column('Review ID', width = 50, anchor = 'center')
+
+        tree.heading('Restaurant', text = 'Restaurant')
+        tree.column('Restaurant', width = 150)
+
+        tree.heading('Review', text = 'Customer Review')
+        tree.column('Review', width = 300)
+
+        tree.heading('Current Reply', text = 'Your Reply')
+        tree.column('Current Reply', width = 300)
+
+        tree.pack(pady = 10, padx = 20, fill = tk.BOTH, expand = True)
+
+        try:
+            conn = db_app.get_DB_CONFIG_connection()
+            cursor = conn.cursor()
+
+            query = """
+                SELECT r.reviewID, res.name, r.reviewContent, rep.replyContent
+                FROM reviews r
+                JOIN restaurant res ON r.restaurantID = res.restaurantID
+                LEFT JOIN replies rep ON r.reviewID = rep.reviewID
+                WHERE res.ownerID = %s
+                ORDER BY r.reviewDate DESC
+            """
+            cursor.execute(query, (self.current_user.owner_id,))
+            rows = cursor.fetchall()
+
+            if not rows:
+                tk.Label(self.root, text="No reviews found for your restaurants.").pack()
+            for row in rows:
+                review_id, res_name, content, reply_content = row
+                display_reply = reply_content if reply_content else "No Reply"
+
+                tree.insert('', tk.END, values=(review_id, res_name, content, display_reply))
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            messagebox.showerror("DB Error", str(e))
+
+        input_frame = tk.Frame(self.root)
+        input_frame.pack(pady = 20)
+
+        tk.Label(input_frame, text = "Write Reply/Update:", font = ("Arial", 10, "bold")).pack(anchor = "w")
+        reply_entry = tk.Entry(input_frame, width = 60)
+        reply_entry.pack(pady = 5)
+
+        def post_reply():
+            selected_item = tree.selection()
+            if not selected_item:
+                messagebox.showwarning("Warning", "Please select a review from the list above.")
+                return
+
+            content = reply_entry.get().strip()
+            if not content:
+                messagebox.showwarning("Warning", "Reply cannot be empty.")
+                return
+
+            try:
+                conn = db_app.get_DB_CONFIG_connection()
+                cursor = conn.cursor()
+
+                cursor.execute("SELECT replyID FROM replies WHERE reviewID = %s", (review_id,))
+                existing = cursor.fetchone()
+
+                if existing:
+                    # update
+                    update_query = "UPDATE replies SET replyContent = %s, replyDate = CURDATE() WHERE reviewID = %s"
+                    cursor.execute(update_query, (content, review_id))
+                    action = "updated"
+                else:
+                    # new
+                    insert_query = "INSERT INTO replies (reviewID, ownerID, replyContent, replyDate) VALUES (%s, %s, %s, CURDATE())"
+                    cursor.execute(insert_query, (review_id, self.current_user.owner_id, content))
+                    action = "posted"
+
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                messagebox.showinfo("Success", f"Reply {action} successfully!")
+                self.show_owner_reply_screen()  # Refresh table
+
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+
+        def delete_review():
+            raw_id = tree.selection()
+            if not raw_id: return
+
+            item_data = tree.item(raw_id[0])
+            review_id = item_data['values'][0]
+
+            if not messagebox.askyesno("Confirm Delete", "Delete this review?\nThis cannot be undone."):
+                return
+
+            # call main function
+            if db_app.Review.delete(review_id):
+                messagebox.showinfo("Deleted", "Review has been removed.")
+                self.show_owner_reply_screen()  # Refresh
+            else:
+                messagebox.showerror("Error", "Failed to delete review.")
+
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady = 10)
+
+        tk.Button(btn_frame, text = "Submit", command = post_reply, width = 15).pack(side = tk.LEFT, padx = 10)
+        tk.Button(btn_frame, text = "Delete Review", command = delete_review).pack(side = tk.LEFT, padx = 10)
+        tk.Button(btn_frame, text = "Back to Dashboard", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
+
+    def show_add_restaurant_screen(self):
+        self.clear_window()
+
+        tk.Label(self.root, text = "Add New Restaurant", font = ("Arial", 16, "bold")).pack(pady = 20)
+
+        form_frame = tk.Frame(self.root)
+        form_frame.pack(pady = 10)
+
+        self.new_res_entries = {}
+        fields = ["Name", "Email", "Phone", "Address", "Cuisine", "Price Range", "Hours"]
+
+        for i, label_text in enumerate(fields):
+            tk.Label(form_frame, text = f"{label_text}:", font = ("Arial", 10, "bold")).grid(row = i, column = 0, sticky = "e", pady = 5, padx = 10)
+
+            entry = tk.Entry(form_frame, width = 40)
+            entry.grid(row = i, column = 1, pady = 5, padx = 10)
+
+            key = label_text
+            self.new_res_entries[key] = entry
+
+        def save_new_restaurant():
+            name = self.new_res_entries["Name"].get().strip()
+            email = self.new_res_entries["Email"].get().strip()
+            phone = self.new_res_entries["Phone"].get().strip()
+            address = self.new_res_entries["Address"].get().strip()
+            cuisine = self.new_res_entries["Cuisine"].get().strip()
+            price = self.new_res_entries["Price Range"].get().strip()
+            hours = self.new_res_entries["Hours"].get().strip()
+
+            if not all([name, email, phone, address, cuisine, price, hours]):
+                messagebox.showwarning("Missing Info", "All fields are required.")
+                return
+
+            new_res = db_app.Restaurant(
+                restaurant_id = 0,
+                name = name,
+                email = email,
+                address = address,
+                phoneNumber = phone,
+                priceRange = price,
+                operatingHours = hours,
+                cuisine = cuisine,
+                owner_id = self.current_user.owner_id
+            )
+
+            if new_res.save():
+                messagebox.showinfo("Success", f"{name} has been added!")
+                self.show_dashboard()  # Go back to menu
+            else:
+                messagebox.showerror("Error", "Could not save restaurant. Check console.")
+
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady = 20)
+
+        tk.Button(btn_frame, text = "Save Restaurant", command = save_new_restaurant, width = 20).pack(side = tk.LEFT, padx = 10)
+
+        tk.Button(btn_frame, text = "Cancel", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
+
+    def show_manage_restaurants_screen(self):
+        self.clear_window()
+
 
     # helper method to get restaurant information
     def get_all_restaurant_names(self):
