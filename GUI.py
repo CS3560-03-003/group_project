@@ -172,9 +172,11 @@ class RestaurantGUI:
 
         tk.Button(frame, text = "View Restaurants", width = 30, command = self.show_owner_restaurants_screen).pack(pady = 10)
         tk.Button(frame, text = "Add New Restaurant", width = 35, command = self.show_add_restaurant_screen).pack(pady = 10)
-        tk.Button(frame, text = "Edit a Restaurant", width = 35, command = self.show_manage_restaurants_screen).pack(pady = 10)
-        tk.Button(frame, text = "Delete a Restaurant", width = 35, command = self.show_manage_restaurants_screen).pack(pady = 10)
+        tk.Button(frame, text = "Edit a Restaurant", width = 35, command = self.show_edit_restaurant_screen).pack(pady = 10)
+        tk.Button(frame, text="Edit Account Settings", width=35, command = self.show_edit_account_screen).pack(pady = 10)
 
+
+    # set up owner restaurants screen
     def show_owner_restaurants_screen(self):
         self.clear_window()
 
@@ -227,10 +229,9 @@ class RestaurantGUI:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-
-
         tk.Button(self.root, text = "Back to Dashboard", command = self.show_dashboard).pack(side = tk.BOTTOM, pady = 20)
 
+    # set up owner reply screen
     def show_owner_reply_screen(self):
         self.clear_window()
 
@@ -352,6 +353,7 @@ class RestaurantGUI:
         tk.Button(btn_frame, text = "Delete Review", command = delete_review).pack(side = tk.LEFT, padx = 10)
         tk.Button(btn_frame, text = "Back to Dashboard", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
 
+    # set up add restaurant screen
     def show_add_restaurant_screen(self):
         self.clear_window()
 
@@ -410,9 +412,504 @@ class RestaurantGUI:
 
         tk.Button(btn_frame, text = "Cancel", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
 
-    def show_manage_restaurants_screen(self):
+        # ==========================================
+        # 1. THE SELECTOR SCREEN (List of Restaurants)
+        # ==========================================
+        def show_edit_restaurant_selector(self):
+            self.clear_window()
+            bg_color = "white"
+            self.root.configure(bg=bg_color)
+
+            tk.Label(self.root, text="Select Restaurant to Edit", font=("Arial", 16, "bold"), bg=bg_color).pack(pady=20)
+
+            # --- TABLE SETUP ---
+            columns = ('ID', 'Name', 'Cuisine', 'Price', 'Phone')
+            tree = ttk.Treeview(self.root, columns=columns, show='headings', height=10)
+
+            # ID Column (Hidden or Small)
+            tree.heading('ID', text='ID')
+            tree.column('ID', width=40, anchor='center')
+
+            tree.heading('Name', text='Name')
+            tree.column('Name', width=150, anchor='w')
+
+            tree.heading('Cuisine', text='Cuisine')
+            tree.column('Cuisine', width=100, anchor='center')
+
+            tree.heading('Price', text='Price')
+            tree.column('Price', width=60, anchor='center')
+
+            tree.heading('Phone', text='Phone')
+            tree.column('Phone', width=100, anchor='center')
+
+            tree.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
+
+            # --- FETCH DATA ---
+            try:
+                conn = db_app.get_DB_CONFIG_connection()
+                cursor = conn.cursor()
+                query = "SELECT restaurantID, name, cuisine, priceRange, phoneNumber FROM restaurant WHERE ownerID = %s"
+                cursor.execute(query, (self.current_user.owner_id,))
+                rows = cursor.fetchall()
+
+                for row in rows:
+                    tree.insert('', tk.END, values=row)
+
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+
+            # --- BUTTONS ---
+            btn_frame = tk.Frame(self.root, bg=bg_color)
+            btn_frame.pack(pady=20)
+
+            def go_to_edit_form():
+                selected = tree.selection()
+                if not selected:
+                    messagebox.showwarning("Warning", "Please select a restaurant first.")
+                    return
+
+                # Get ID from selection (first column)
+                item = tree.item(selected[0])
+                res_id = item['values'][0]
+
+                # Navigate to the form
+                self.show_edit_restaurant_form(res_id)
+
+            tk.Button(btn_frame, text="Edit Selected", command=go_to_edit_form,
+                      bg="#FF9800", fg="white", width=20).pack(side=tk.LEFT, padx=10)
+
+            tk.Button(btn_frame, text="Back", command=self.show_owner_menu).pack(side=tk.LEFT, padx=10)
+
+        # ==========================================
+        # 2. THE EDIT FORM (Save & Delete Logic)
+        # ==========================================
+        def show_edit_restaurant_form(self, res_id):
+            self.clear_window()
+            bg_color = "white"
+            self.root.configure(bg=bg_color)
+
+            tk.Label(self.root, text="Edit Restaurant Details", font=("Arial", 16, "bold"), bg=bg_color).pack(pady=20)
+
+            # 1. Fetch Current Data to Pre-fill
+            current_data = {}
+            try:
+                conn = db_app.get_DB_CONFIG_connection()
+                cursor = conn.cursor(dictionary=True)
+                query = "SELECT * FROM restaurant WHERE restaurantID = %s"
+                cursor.execute(query, (res_id,))
+                current_data = cursor.fetchone()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.show_edit_restaurant_selector()
+                return
+
+            # 2. Build Form
+            form_frame = tk.Frame(self.root, bg=bg_color)
+            form_frame.pack(pady=10)
+
+            self.edit_res_entries = {}
+            # Map Label -> DB Column Name
+            fields = {
+                "Name": "name",
+                "Email": "email",
+                "Phone": "phoneNumber",
+                "Address": "address",
+                "Cuisine": "cuisine",
+                "Price Range": "priceRange",
+                "Hours": "operatingHours"
+            }
+
+            for i, (label, col_name) in enumerate(fields.items()):
+                tk.Label(form_frame, text=f"{label}:", bg=bg_color, font=("Arial", 10, "bold")).grid(row=i, column=0,
+                                                                                                     sticky="e", pady=5,
+                                                                                                     padx=10)
+
+                entry = tk.Entry(form_frame, width=40)
+                val = current_data.get(col_name, "")
+                entry.insert(0, str(val))
+                entry.grid(row=i, column=1, pady=5, padx=10)
+
+                self.edit_res_entries[label] = entry
+
+            # --- ACTIONS ---
+            def save_changes():
+                data = {k: v.get().strip() for k, v in self.edit_res_entries.items()}
+                if not all(data.values()):
+                    messagebox.showwarning("Warning", "All fields are required.")
+                    return
+
+                # Reuse existing save() method (Updates because ID is not 0)
+                updated_res = db_app.Restaurant(
+                    restaurant_id=res_id,
+                    name=data["Name"],
+                    email=data["Email"],
+                    address=data["Address"],
+                    phoneNumber=data["Phone"],
+                    priceRange=data["Price Range"],
+                    operatingHours=data["Hours"],
+                    cuisine=data["Cuisine"],
+                    owner_id=self.current_user.owner_id
+                )
+
+                if updated_res.save():
+                    messagebox.showinfo("Success", "Restaurant updated successfully!")
+                    self.show_edit_restaurant_selector()
+                else:
+                    messagebox.showerror("Error", "Update failed.")
+
+            def delete_restaurant():
+                if not messagebox.askyesno("Confirm Delete",
+                                           "Are you sure you want to delete this restaurant?\nALL reviews and replies will also be deleted.\nThis cannot be undone."):
+                    return
+
+                # --- USE THE NEW BACKEND FUNCTION ---
+                if db_app.Restaurant.delete(res_id):
+                    messagebox.showinfo("Deleted", "Restaurant deleted.")
+                    self.show_edit_restaurant_selector()  # Return to list
+                else:
+                    messagebox.showerror("Error", "Failed to delete restaurant. Check console.")
+
+            # --- BUTTONS ---
+            btn_frame = tk.Frame(self.root, bg=bg_color)
+            btn_frame.pack(pady=20)
+
+            tk.Button(btn_frame, text="Save Changes", command=save_changes,
+                      bg="#4CAF50", fg="white", width=15).pack(side=tk.LEFT, padx=10)
+
+            tk.Button(btn_frame, text="Delete Restaurant", command=delete_restaurant,
+                      bg="#F44336", fg="white", width=15).pack(side=tk.LEFT, padx=10)
+
+            tk.Button(btn_frame, text="Cancel", command=self.show_edit_restaurant_selector).pack(side=tk.LEFT, padx=10)
+
+        # ==========================================
+        # 1. THE SELECTOR SCREEN (List of Restaurants)
+        # ==========================================
+        def show_edit_restaurant_selector(self):
+            self.clear_window()
+            bg_color = "white"
+            self.root.configure(bg=bg_color)
+
+            tk.Label(self.root, text="Select Restaurant to Edit", font=("Arial", 16, "bold"), bg=bg_color).pack(pady=20)
+
+            # --- TABLE SETUP ---
+            columns = ('ID', 'Name', 'Cuisine', 'Price', 'Phone')
+            tree = ttk.Treeview(self.root, columns=columns, show='headings', height=10)
+
+            # ID Column (Hidden or Small)
+            tree.heading('ID', text='ID')
+            tree.column('ID', width=40, anchor='center')
+
+            tree.heading('Name', text='Name')
+            tree.column('Name', width=150, anchor='w')
+
+            tree.heading('Cuisine', text='Cuisine')
+            tree.column('Cuisine', width=100, anchor='center')
+
+            tree.heading('Price', text='Price')
+            tree.column('Price', width=60, anchor='center')
+
+            tree.heading('Phone', text='Phone')
+            tree.column('Phone', width=100, anchor='center')
+
+            tree.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
+
+            # --- FETCH DATA ---
+            try:
+                conn = db_app.get_DB_CONFIG_connection()
+                cursor = conn.cursor()
+                query = "SELECT restaurantID, name, cuisine, priceRange, phoneNumber FROM restaurant WHERE ownerID = %s"
+                cursor.execute(query, (self.current_user.owner_id,))
+                rows = cursor.fetchall()
+
+                for row in rows:
+                    tree.insert('', tk.END, values=row)
+
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+
+            # --- BUTTONS ---
+            btn_frame = tk.Frame(self.root, bg=bg_color)
+            btn_frame.pack(pady=20)
+
+            def go_to_edit_form():
+                selected = tree.selection()
+                if not selected:
+                    messagebox.showwarning("Warning", "Please select a restaurant first.")
+                    return
+
+                # Get ID from selection (first column)
+                item = tree.item(selected[0])
+                res_id = item['values'][0]
+
+                # Navigate to the form
+                self.show_edit_restaurant_form(res_id)
+
+            tk.Button(btn_frame, text="Edit Selected", command=go_to_edit_form,
+                      bg="#FF9800", fg="white", width=20).pack(side=tk.LEFT, padx=10)
+
+            tk.Button(btn_frame, text="Back", command=self.show_owner_menu).pack(side=tk.LEFT, padx=10)
+
+        # ==========================================
+        # 2. THE EDIT FORM (Save & Delete Logic)
+        # ==========================================
+        def show_edit_restaurant_form(self, res_id):
+            self.clear_window()
+            bg_color = "white"
+            self.root.configure(bg=bg_color)
+
+            tk.Label(self.root, text="Edit Restaurant Details", font=("Arial", 16, "bold"), bg=bg_color).pack(pady=20)
+
+            # 1. Fetch Current Data to Pre-fill
+            current_data = {}
+            try:
+                conn = db_app.get_DB_CONFIG_connection()
+                cursor = conn.cursor(dictionary=True)
+                query = "SELECT * FROM restaurant WHERE restaurantID = %s"
+                cursor.execute(query, (res_id,))
+                current_data = cursor.fetchone()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.show_edit_restaurant_selector()
+                return
+
+            # 2. Build Form
+            form_frame = tk.Frame(self.root, bg=bg_color)
+            form_frame.pack(pady=10)
+
+            self.edit_res_entries = {}
+            # Map Label -> DB Column Name
+            fields = {
+                "Name": "name",
+                "Email": "email",
+                "Phone": "phoneNumber",
+                "Address": "address",
+                "Cuisine": "cuisine",
+                "Price Range": "priceRange",
+                "Hours": "operatingHours"
+            }
+
+            for i, (label, col_name) in enumerate(fields.items()):
+                tk.Label(form_frame, text=f"{label}:", bg=bg_color, font=("Arial", 10, "bold")).grid(row=i, column=0,
+                                                                                                     sticky="e", pady=5,
+                                                                                                     padx=10)
+
+                entry = tk.Entry(form_frame, width=40)
+                val = current_data.get(col_name, "")
+                entry.insert(0, str(val))
+                entry.grid(row=i, column=1, pady=5, padx=10)
+
+                self.edit_res_entries[label] = entry
+
+            # --- ACTIONS ---
+            def save_changes():
+                data = {k: v.get().strip() for k, v in self.edit_res_entries.items()}
+                if not all(data.values()):
+                    messagebox.showwarning("Warning", "All fields are required.")
+                    return
+
+                # Reuse existing save() method (Updates because ID is not 0)
+                updated_res = db_app.Restaurant(
+                    restaurant_id=res_id,
+                    name=data["Name"],
+                    email=data["Email"],
+                    address=data["Address"],
+                    phoneNumber=data["Phone"],
+                    priceRange=data["Price Range"],
+                    operatingHours=data["Hours"],
+                    cuisine=data["Cuisine"],
+                    owner_id=self.current_user.owner_id
+                )
+
+                if updated_res.save():
+                    messagebox.showinfo("Success", "Restaurant updated successfully!")
+                    self.show_edit_restaurant_selector()
+                else:
+                    messagebox.showerror("Error", "Update failed.")
+
+            def delete_restaurant():
+                if not messagebox.askyesno("Confirm Delete",
+                                           "Are you sure you want to delete this restaurant?\nALL reviews and replies will also be deleted.\nThis cannot be undone."):
+                    return
+
+                # --- USE THE NEW BACKEND FUNCTION ---
+                if db_app.Restaurant.delete(res_id):
+                    messagebox.showinfo("Deleted", "Restaurant deleted.")
+                    self.show_edit_restaurant_selector()  # Return to list
+                else:
+                    messagebox.showerror("Error", "Failed to delete restaurant. Check console.")
+
+            # --- BUTTONS ---
+            btn_frame = tk.Frame(self.root, bg=bg_color)
+            btn_frame.pack(pady=20)
+
+            tk.Button(btn_frame, text="Save Changes", command=save_changes,
+                      bg="#4CAF50", fg="white", width=15).pack(side=tk.LEFT, padx=10)
+
+            tk.Button(btn_frame, text="Delete Restaurant", command=delete_restaurant,
+                      bg="#F44336", fg="white", width=15).pack(side=tk.LEFT, padx=10)
+
+            tk.Button(btn_frame, text="Cancel", command=self.show_edit_restaurant_selector).pack(side=tk.LEFT, padx=10)
+
+    # set up retaurant edit page
+    def show_edit_restaurant_screen(self):
         self.clear_window()
 
+
+        tk.Label(self.root, text = "Select Restaurant to Edit", font = ("Arial", 16, "bold")).pack(pady = 20)
+
+        columns = ('ID', 'Name', 'Cuisine', 'Price', 'Phone')
+        tree = ttk.Treeview(self.root, columns = columns, show = 'headings', height = 10)
+
+        tree.heading('ID', text = 'ID')
+        tree.column('ID', width = 40, anchor = 'center')
+
+        tree.heading('Name', text = 'Name')
+        tree.column('Name', width = 150, anchor = 'w')
+
+        tree.heading('Cuisine', text = 'Cuisine')
+        tree.column('Cuisine', width = 100, anchor = 'center')
+
+        tree.heading('Price', text = 'Price')
+        tree.column('Price', width = 60, anchor = 'center')
+
+        tree.heading('Phone', text = 'Phone')
+        tree.column('Phone', width = 100, anchor = 'center')
+
+        tree.pack(pady = 10, padx = 20, fill = tk.BOTH, expand = True)
+
+        try:
+            conn = db_app.get_DB_CONFIG_connection()
+            cursor = conn.cursor()
+            query = "SELECT restaurantID, name, cuisine, priceRange, phoneNumber FROM restaurant WHERE ownerID = %s"
+            cursor.execute(query, (self.current_user.owner_id,))
+            rows = cursor.fetchall()
+
+            for row in rows:
+                tree.insert('', tk.END, values = row)
+
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+        # --- BUTTONS ---
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady = 20)
+
+        def go_to_edit_form():
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning("Warning", "Please select a restaurant first.")
+                return
+
+            item = tree.item(selected[0])
+            res_id = item['values'][0]
+
+            # Navigate to the form
+            self.show_edit_restaurant_form(res_id)
+
+        tk.Button(btn_frame, text = "Edit Selected", command = go_to_edit_form, width = 20).pack(side = tk.LEFT, padx = 10)
+
+        tk.Button(btn_frame, text = "Back", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
+
+    # set up restaurant edit form
+    def show_edit_restaurant_form(self, res_id):
+        self.clear_window()
+
+
+        tk.Label(self.root, text = "Edit Restaurant Details", font = ("Arial", 16, "bold")).pack(pady = 20)
+
+        current_data = {}
+        try:
+            conn = db_app.get_DB_CONFIG_connection()
+            cursor = conn.cursor(dictionary = True)
+            query = "SELECT * FROM restaurant WHERE restaurantID = %s"
+            cursor.execute(query, (res_id,))
+            current_data = cursor.fetchone()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.show_edit_restaurant_selector()
+            return
+
+        form_frame = tk.Frame(self.root)
+        form_frame.pack(pady = 10)
+
+        self.edit_res_entries = {}
+
+        fields = {
+            "Name": "name",
+            "Email": "email",
+            "Phone": "phoneNumber",
+            "Address": "address",
+            "Cuisine": "cuisine",
+            "Price Range": "priceRange",
+            "Hours": "operatingHours"
+        }
+
+        for i, (label, col_name) in enumerate(fields.items()):
+            tk.Label(form_frame, text = f"{label}:", font = ("Arial", 10, "bold")).grid(row = i, column = 0, sticky = "e", pady = 5, padx = 10)
+
+            entry = tk.Entry(form_frame, width = 40)
+            val = current_data.get(col_name, "")
+            entry.insert(0, str(val))
+            entry.grid(row = i, column = 1, pady = 5, padx = 10)
+
+            self.edit_res_entries[label] = entry
+
+        def save_changes():
+            data = {k: v.get().strip() for k, v in self.edit_res_entries.items()}
+            if not all(data.values()):
+                messagebox.showwarning("Warning", "All fields are required.")
+                return
+
+            # Reuse existing save() method
+            updated_res = db_app.Restaurant(
+                restaurant_id=res_id,
+                name=data["Name"],
+                email=data["Email"],
+                address=data["Address"],
+                phoneNumber=data["Phone"],
+                priceRange=data["Price Range"],
+                operatingHours=data["Hours"],
+                cuisine=data["Cuisine"],
+                owner_id=self.current_user.owner_id
+            )
+
+            if updated_res.save():
+                messagebox.showinfo("Success", "Restaurant updated successfully!")
+                self.show_edit_restaurant_screen()
+            else:
+                messagebox.showerror("Error", "Update failed.")
+
+        def delete_restaurant():
+            if not messagebox.askyesno("Confirm Delete",
+                                       "Are you sure you want to delete this restaurant?\nALL reviews and replies will also be deleted.\nThis cannot be undone."):
+                return
+
+            if db_app.Restaurant.delete(res_id):
+                messagebox.showinfo("Deleted", "Restaurant deleted.")
+                self.show_edit_restaurant_screen()  # Return to list
+            else:
+                messagebox.showerror("Error", "Failed to delete restaurant. Check console.")
+
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady = 20)
+
+        tk.Button(btn_frame, text = "Save Changes", command = save_changes, width = 15).pack(side = tk.LEFT, padx = 10)
+
+        tk.Button(btn_frame, text = "Delete Restaurant", command = delete_restaurant, width = 15).pack(side = tk.LEFT, padx = 10)
+
+        tk.Button(btn_frame, text = "Cancel", command = self.show_edit_restaurant_screen).pack(side = tk.LEFT, padx = 10)
 
     # helper method to get restaurant information
     def get_all_restaurant_names(self):
@@ -858,9 +1355,10 @@ class RestaurantGUI:
                 self.show_dashboard()
             else:
                 messagebox.showerror("Error", "Update failed. Username or Email might be taken.")
-        
+
         def delete_account():
-            confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete your account? This action is irreversible.")
+            confirm = messagebox.askyesno("Confirm Delete",
+                                          "Are you sure you want to delete your account? This action is irreversible.")
             if confirm:
                 if self.current_user.delete_account():
                     messagebox.showinfo("Deleted", "Your account has been deleted.")
@@ -869,14 +1367,13 @@ class RestaurantGUI:
                 else:
                     messagebox.showerror("Error", "Failed to delete account.")
 
-
         # Buttons
         btn_frame = tk.Frame(self.root)
-        btn_frame.pack(pady = 20)
+        btn_frame.pack(pady=20)
 
         tk.Button(btn_frame, text = "Save Changes", command = save_changes, width = 15).pack(
             side = tk.LEFT, padx = 10)
-        tk.Button(btn_frame, text = "Cancel", command=self.show_dashboard).pack(side = tk.LEFT, padx = 10)
+        tk.Button(btn_frame, text = "Cancel", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
         tk.Button(btn_frame, text = "Delete Account", command = delete_account, fg = "red").pack(side = tk.LEFT, padx = 10)
 
 
