@@ -155,6 +155,7 @@ class RestaurantGUI:
         tk.Button(frame, text = "Search Restaurant", width = 20, command = self.show_search_reviews_screen).pack(pady = 10)
         tk.Button(frame, text = "Write a Review", width = 20, command = self.show_add_review_form).pack(pady = 10)
         tk.Button(frame, text = "Manage My Reviews (Edit/Delete)", width = 30, command=self.show_my_reviews_screen).pack(pady = 10)
+        tk.Button(frame, text = "Edit Account Info", width = 30, command = self.show_edit_account_screen).pack(pady = 10)
 
     def show_owner_menu(self):
         frame = tk.Frame(self.root, bg = "white")
@@ -438,10 +439,10 @@ class RestaurantGUI:
         tk.Label(form_frame, text=current_data['name'], font=("Arial", 10)).grid(row=0, column=1,
                                                                                               sticky="w", padx=10)
 
-        # Rating 
+        # Rating
         tk.Label(form_frame, text = "Rating:").grid(row = 1, column = 0, sticky = "e", pady = 5)
         self.edit_rating_combo = ttk.Combobox(form_frame, values = [1, 2, 3, 4, 5], state = "readonly", width = 5)
-        self.edit_rating_combo.set(current_data['rating'])  
+        self.edit_rating_combo.set(current_data['rating'])
         self.edit_rating_combo.grid(row = 1, column = 1, sticky = "w", padx = 10)
 
         # Content
@@ -562,6 +563,61 @@ class RestaurantGUI:
                 self.show_login_screen()
 
         tk.Button(self.root, text = "Back", command = go_back).pack(pady = 10)
+
+    # set up edit account screen
+    def show_edit_account_screen(self):
+        self.clear_window()
+
+        tk.Label(self.root, text = "Edit Account Information", font = ("Arial", 16, "bold")).pack(pady = 20)
+
+        form_frame = tk.Frame(self.root)
+        form_frame.pack(pady = 10)
+
+        self.account_entries = {}
+
+        # Define fields and their current values
+        fields = {
+            "Username": self.current_user.username,
+            "Password": self.current_user.password,
+            "Email": self.current_user.email,
+            "Full Name": self.current_user.full_name
+        }
+
+        for i, (label_text, value) in enumerate(fields.items()):
+            tk.Label(form_frame, text = f"{label_text}:", font = ("Arial", 10, "bold")).grid(row = i, column = 0, sticky = "e", pady = 10, padx = 10)
+
+            entry = tk.Entry(form_frame, width = 30)
+            entry.insert(0, value)
+            entry.grid(row = i, column = 1, pady = 10, padx = 10)
+
+            self.account_entries[label_text] = entry
+
+        def save_changes():
+            new_user = self.account_entries["Username"].get().strip()
+            new_pass = self.account_entries["Password"].get().strip()
+            new_email = self.account_entries["Email"].get().strip()
+            new_name = self.account_entries["Full Name"].get().strip()
+
+            if not all([new_user, new_pass, new_email, new_name]):
+                messagebox.showwarning("Warning", "All fields must be filled.")
+                return
+
+            if self.current_user.update_account(new_user, new_pass, new_email, new_name):
+                messagebox.showinfo("Success", "Account details updated successfully!")
+
+                # Refresh dashboard title with new name
+                self.show_dashboard()
+            else:
+                messagebox.showerror("Error", "Update failed. Username or Email might be taken.")
+
+        # Buttons
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady = 20)
+
+        tk.Button(btn_frame, text = "Save Changes", command = save_changes, width = 15).pack(
+            side = tk.LEFT, padx = 10)
+        tk.Button(btn_frame, text = "Cancel", command=self.show_dashboard).pack(side = tk.LEFT, padx = 10)
+
 
 if __name__ == "__main__":
     root = tk.Tk()
