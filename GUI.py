@@ -8,6 +8,7 @@ import Main as db_app
 
 class RestaurantGUI:
     def __init__(self, root):
+        self.all_restaurant_names = None
         self.root = root
         self.root.title("Restaurant Review System")
         self.root.geometry("700x600")
@@ -22,6 +23,11 @@ class RestaurantGUI:
     def clear_window(self):
         for widget in self.root.winfo_children():
             widget.destroy()
+
+    # clear current user
+    def logout(self):
+        self.current_user = None
+        self.show_login_screen()
 
     # Set up login screen
     def show_login_screen(self):
@@ -42,22 +48,24 @@ class RestaurantGUI:
         tk.Button(footer_frame, text = "Create New Account", command = self.show_registration_screen).pack(side = "left")
         tk.Button(footer_frame, text = "Restaurant Search", command = self.show_search_reviews_screen).pack(side = "right")
 
-        # Inputs
+        # Username text box
         tk.Label(self.root, text = "Username:").pack(pady = 5)
         self.entry_user = tk.Entry(self.root)
         self.entry_user.pack(pady = 5)
 
+        # Owner text box
         tk.Label(self.root, text = "Password:").pack(pady = 5)
-        self.entry_pass = tk.Entry(self.root, show = "*")
+        self.entry_pass = tk.Entry(self.root, show = "*") # to hide password
         self.entry_pass.pack(pady = 5)
 
+        # Log in button
         tk.Button(self.root, text = "Login", command = self.perform_login).pack(pady = 20)
 
     # Set up create an account screen
     def show_registration_screen(self):
         self.clear_window()
 
-        tk.Label(self.root, text = "Create Account", font = ("Arial", 20, "bold")).pack(pady = 20)
+        tk.Label(self.root, text = "Create Account", font = ("Arial", 20)).pack(pady = 20)
 
         # User Type Selection
         tk.Label(self.root, text = "I am a:").pack()
@@ -74,6 +82,7 @@ class RestaurantGUI:
         entries = {}
         fields = ["Username", "Password", "Full Name", "Email"]
 
+        # loop to make text boxes
         for field in fields:
             tk.Label(self.root, text = f"{field}:").pack(pady = (5, 0))
             entry = tk.Entry(self.root, width = 30)
@@ -82,6 +91,7 @@ class RestaurantGUI:
             entry.pack(pady = 2)
             entries[field] = entry
 
+        # perform account creation
         def perform_registration():
             user_type = type_var.get()
             username = entries["Username"].get().strip()
@@ -93,7 +103,7 @@ class RestaurantGUI:
                 messagebox.showwarning("Missing Data", "Please fill in all fields.")
                 return
 
-            success = False
+            # make owner or customer object
             if user_type == "Owner":
                 new_user = db_app.Owner(0, username, password, email, full_name)
                 success = new_user.register()
@@ -137,7 +147,7 @@ class RestaurantGUI:
 
         # Header
         header_text = f"Dashboard: {self.current_user.full_name} ({type(self.current_user).__name__})"
-        tk.Label(self.root, text = header_text, font = ("Arial", 14, "bold")).pack(pady = 10)
+        tk.Label(self.root, text = header_text, font = ("Arial", 20)).pack(pady = 20)
 
         # Print depending on if customer or owner
         if isinstance(self.current_user, db_app.Customer):
@@ -146,12 +156,6 @@ class RestaurantGUI:
             self.show_owner_menu()
 
         tk.Button(self.root, text = "Logout", command = self.logout, fg = "red").pack(side = tk.BOTTOM, pady = 20)
-
-    # clear current user
-    def logout(self):
-        self.current_user = None
-        self.show_login_screen()
-
 
     # set up customer options
     def show_customer_menu(self):
@@ -163,18 +167,17 @@ class RestaurantGUI:
         tk.Button(frame, text = "Manage My Reviews (Edit/Delete)", width = 30, command=self.show_my_reviews_screen).pack(pady = 10)
         tk.Button(frame, text = "Edit Account Info", width = 30, command = self.show_edit_account_screen).pack(pady = 10)
 
+    # set up owner options
     def show_owner_menu(self):
         frame = tk.Frame(self.root)
         frame.pack(pady = 20)
 
         tk.Button(frame, text = "Search All Reviews", width = 30, command = self.show_search_reviews_screen).pack(pady = 10)
         tk.Button(frame, text = "Reply or Delete Reviews", width = 30, command = self.show_owner_reply_screen).pack(pady = 10)
-
         tk.Button(frame, text = "View Restaurants", width = 30, command = self.show_owner_restaurants_screen).pack(pady = 10)
         tk.Button(frame, text = "Add New Restaurant", width = 35, command = self.show_add_restaurant_screen).pack(pady = 10)
         tk.Button(frame, text = "Edit a Restaurant", width = 35, command = self.show_edit_restaurant_screen).pack(pady = 10)
         tk.Button(frame, text="Edit Account Settings", width=35, command = self.show_edit_account_screen).pack(pady = 10)
-
 
     # set up owner restaurants screen
     def show_owner_restaurants_screen(self):
@@ -290,11 +293,31 @@ class RestaurantGUI:
         reply_entry = tk.Entry(input_frame, width = 60)
         reply_entry.pack(pady = 5)
 
-        def post_reply():
-            selected_item = tree.selection()
-            if not selected_item:
-                messagebox.showwarning("Warning", "Please select a review from the list above.")
-                return
+        def get_selected_review_id():
+            # 1. Ask the treeview what is selected RIGHT NOW
+            current_selection = tree.selection()
+
+            if not current_selection:
+                messagebox.showwarning("Warning", "Please click on a review in the list first.")
+                return None
+
+            # 2. Get the values from that specific row
+            # tree.item(current_selection[0]) returns a dictionary. 'values' is the list of column data.
+            row_values = tree.item(current_selection[0])['values']
+
+            # 3. The Review ID is the first column (Index 0)
+            raw_id = row_values[0]
+
+            # 4. Clean it up (Handles the tuple error we saw before)
+            if isinstance(raw_id, (list, tuple)):
+                return int(raw_id[0])
+            return int(raw_id)
+
+        # --- POST / UPDATE LOGIC ---
+        def post_or_update_reply():
+            # 1. CALL THE HELPER (This ensures we get the ID of the clicked row)
+            review_id = get_selected_review_id()
+            if not review_id: return
 
             content = reply_entry.get().strip()
             if not content:
@@ -305,16 +328,17 @@ class RestaurantGUI:
                 conn = db_app.get_DB_CONFIG_connection()
                 cursor = conn.cursor()
 
+                # Check if a reply ALREADY exists for this SPECIFIC review_id
                 cursor.execute("SELECT replyID FROM replies WHERE reviewID = %s", (review_id,))
                 existing = cursor.fetchone()
 
                 if existing:
-                    # update
+                    # UPDATE existing reply
                     update_query = "UPDATE replies SET replyContent = %s, replyDate = CURDATE() WHERE reviewID = %s"
                     cursor.execute(update_query, (content, review_id))
                     action = "updated"
                 else:
-                    # new
+                    # INSERT new reply
                     insert_query = "INSERT INTO replies (reviewID, ownerID, replyContent, replyDate) VALUES (%s, %s, %s, CURDATE())"
                     cursor.execute(insert_query, (review_id, self.current_user.owner_id, content))
                     action = "posted"
@@ -324,6 +348,10 @@ class RestaurantGUI:
                 conn.close()
 
                 messagebox.showinfo("Success", f"Reply {action} successfully!")
+
+                # Clear the input box so you don't accidentally reply with old text later
+                reply_entry.delete(0, tk.END)
+
                 self.show_owner_reply_screen()  # Refresh table
 
             except Exception as e:
@@ -349,7 +377,7 @@ class RestaurantGUI:
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(pady = 10)
 
-        tk.Button(btn_frame, text = "Submit", command = post_reply, width = 15).pack(side = tk.LEFT, padx = 10)
+        tk.Button(btn_frame, text = "Submit", command = post_or_update_reply, width = 15).pack(side = tk.LEFT, padx = 10)
         tk.Button(btn_frame, text = "Delete Review", command = delete_review).pack(side = tk.LEFT, padx = 10)
         tk.Button(btn_frame, text = "Back to Dashboard", command = self.show_dashboard).pack(side = tk.LEFT, padx = 10)
 
@@ -584,24 +612,43 @@ class RestaurantGUI:
         self.clear_window()
         tk.Label(self.root, text = "Write a New Review", font = ("Arial", 16)).pack(pady = 10)
 
-        tk.Label(self.root, text = "Select Restaurant:").pack()
-        self.combo_res_name = ttk.Combobox(self.root, width = 30, state = "readonly")
-        self.combo_res_name['values'] = self.get_all_restaurant_names()
-        if self.combo_res_name['values']:
-            self.combo_res_name.current(0)
+        tk.Label(self.root, text = "Select Restaurant (Type to Search):").pack()
+        self.all_restaurant_names = self.get_all_restaurant_names()
+
+        self.combo_res_name = ttk.Combobox(self.root, width = 30)
         self.combo_res_name.pack(pady = 5)
+        self.combo_res_name['values'] = self.all_restaurant_names
 
-        tk.Label(self.root, text = "Rating (1-5):").pack()
-        combo_rating = ttk.Combobox(self.root, values = [1, 2, 3, 4, 5], state = "readonly")
-        combo_rating.current(4)  # Default to 5 stars
-        combo_rating.pack(pady = 5)
+        def check_input(event):
+            # Get what the user typed
+            value = event.widget.get()
 
-        restaurant_names = self.get_all_restaurant_names()
-        self.combo_res_name['values'] = restaurant_names
+            if value == '':
+                # If empty, show all options
+                self.combo_res_name['values'] = self.all_restaurant_names
+            else:
+                # Filter the list (Case-insensitive)
+                data = []
+                for item in self.all_restaurant_names:
+                    if value.lower() in item.lower():
+                        data.append(item)
 
-        tk.Label(self.root, text = "Review Content:").pack()
-        entry_content = tk.Entry(self.root, width = 50)
-        entry_content.pack(pady = 5)
+                # Update the dropdown list with matches
+                self.combo_res_name['values'] = data
+
+        # Bind the function to keyboard typing
+        self.combo_res_name.bind('<KeyRelease>', check_input)
+        # -----------------------
+
+        # --- 2. RATING & CONTENT ---
+        tk.Label(self.root, text="Rating (1-5):").pack()
+        combo_rating = ttk.Combobox(self.root, values=[1, 2, 3, 4, 5], state="readonly")
+        combo_rating.current(4)
+        combo_rating.pack(pady=5)
+
+        tk.Label(self.root, text="Review Content:").pack()
+        entry_content = tk.Entry(self.root, width=50)
+        entry_content.pack(pady=5)
 
         def submit_review():
             res_name = self.combo_res_name.get()
