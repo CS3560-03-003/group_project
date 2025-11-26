@@ -887,7 +887,7 @@ class RestaurantGUI:
             try:
                 conn = db_app.get_DB_CONFIG_connection()
                 cursor = conn.cursor()
-
+                # utilize the round and average function for SQL
                 query = """SELECT b.name, a.rating, a.reviewContent, c.replyContent,
                            (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE restaurantID = b.restaurantID)
                            FROM reviews a JOIN restaurant b ON b.restaurantID = a.restaurantID
@@ -1027,3 +1027,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RestaurantGUI(root)
     root.mainloop()
+
